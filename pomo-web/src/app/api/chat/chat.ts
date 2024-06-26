@@ -47,7 +47,7 @@ function formatImage(imageData: string) {
 }
 
 const model = genAI.getGenerativeModel({
-  model: "gemini-1.5-pro",
+  model: "gemini-1.5-flash-latest",
   safetySettings: safetySettings,
   generationConfig: generationConfig,
 });
@@ -82,9 +82,8 @@ export async function sendMessage2LLM(imageData: string) {
   const imagePart = formatImage(base64Data);
 
   try {
-    const result = await chat.sendMessage([imagePart]);
-    const response = result.response;
-    return response.text();
+    const result = await chat.sendMessageStream([imagePart]);
+    return result;
   } catch (error) {
     console.error("Error generating content:", error);
     throw error;

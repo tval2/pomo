@@ -5,15 +5,18 @@ import { useRef, useState, useEffect, useCallback } from "react";
 const SHOW_SCREENSHOT = false;
 const SCREENSHOT_ON_CLICK = true;
 const SCREENSHOT_CONTINUOUS = true;
-const SCREENSHOT_INTERVAL = 5000;
+const SCREENSHOT_INTERVAL = 2000;
 
 export default function WebcamVideo() {
   const [queue, setQueue] = useState<string[]>([]);
-  const [responses, setResponses] = useState<string[]>([]);
+  const [responses, setResponses] = useState<{ id: number; text: string }[]>(
+    []
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [mediaStream, setMediaStream] = useState<MediaStream>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  let responseId = 0;
 
   const takeScreenshot = useCallback(() => {
     const canvas = canvasRef.current;
@@ -68,8 +71,38 @@ export default function WebcamVideo() {
         );
       }
 
-      const data = await response.json();
-      return data.result;
+      if (!response.body) {
+        throw new Error("Response body is null");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedResponse = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        accumulatedResponse += chunk;
+
+        setResponses((prevResponses) => {
+          const lastResponse = prevResponses[prevResponses.length - 1];
+          if (lastResponse && lastResponse.id === responseId) {
+            return [
+              ...prevResponses.slice(0, -1),
+              { ...lastResponse, text: lastResponse.text + chunk },
+            ];
+          } else {
+            return [
+              ...prevResponses,
+              { id: responseId, text: accumulatedResponse },
+            ];
+          }
+        });
+      }
+
+      responseId++;
     } catch (error) {
       console.error("Error calling chat API:", error);
     }
@@ -82,8 +115,7 @@ export default function WebcamVideo() {
     const imageData = queue[0];
 
     try {
-      const response = await callLLM(imageData);
-      setResponses((prevResponses) => [...prevResponses, response]);
+      await callLLM(imageData);
       setQueue((prevQueue) => prevQueue.slice(1));
     } catch (error) {
       console.error("Error processing queue item:", error);
@@ -165,10 +197,19 @@ export default function WebcamVideo() {
       />
       <div>
         <h3>LLM Responses:</h3>
-        {responses.map((response, index) => (
-          <p key={index}>{response}</p>
+        {responses.map((response) => (
+          <p key={response.id} className="message">
+            {response.text}
+          </p>
         ))}
       </div>
+      <style jsx>{`
+        .message {
+          white-space: pre-wrap;
+          margin-bottom: 2em;
+          padding: 0.5em;
+        }
+      `}</style>
     </div>
   );
 }

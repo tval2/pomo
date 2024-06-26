@@ -88,7 +88,7 @@ export function fileToGenerativePart(path: string, mimeType: string) {
     },
   };
 }
-
+process.cwd();
 function logWarnings(
   output: any[],
   levelsToLog: string[] = ["MEDIUM", "HIGH"]
