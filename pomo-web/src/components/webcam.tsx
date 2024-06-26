@@ -6,6 +6,7 @@ const SHOW_SCREENSHOT = false;
 const SCREENSHOT_ON_CLICK = true;
 const SCREENSHOT_CONTINUOUS = true;
 const SCREENSHOT_INTERVAL = 2000;
+const SHOW_AUDIO = false;
 
 export default function WebcamVideo() {
   const [queue, setQueue] = useState<string[]>([]);
@@ -14,8 +15,12 @@ export default function WebcamVideo() {
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [mediaStream, setMediaStream] = useState<MediaStream>();
+  const [audioRecorder, setAudioRecorder] = useState<MediaRecorder>();
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   let responseId = 0;
 
   const takeScreenshot = useCallback(() => {
@@ -34,11 +39,23 @@ export default function WebcamVideo() {
 
   const setupMediaStream = useCallback(async () => {
     try {
+      // Video Stream
       const ms = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user" },
         audio: false,
       });
       setMediaStream(ms);
+
+      // Audio Stream
+      const as = await navigator.mediaDevices.getUserMedia({
+        video: false,
+        audio: true,
+      });
+      const recorder = new MediaRecorder(as, { mimeType: "audio/ogg" });
+      recorder.ondataavailable = (e) => {
+        setAudioChunks((audioChunks) => [...audioChunks, e.data]);
+      };
+      setAudioRecorder(recorder);
     } catch (e) {
       alert("Camera is disabled");
       throw e;
@@ -128,6 +145,33 @@ export default function WebcamVideo() {
     processQueue();
   }, [queue, processQueue]);
 
+  const toggleRecording = () => {
+    if (!audioRecorder) {
+      return;
+    }
+
+    if (!isRecording) {
+      setAudioChunks([]);
+      audioRecorder.start(100); // how many ms per audio chunk
+    } else {
+      audioRecorder.stop();
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        let audioURL = e.target?.result;
+        console.log("New audio blob" + audioURL);
+        let audio = audioRef.current;
+        if (!audio || !audioURL) {
+          return;
+        }
+
+        audio.src = (audioURL as string);
+      }
+      reader.readAsDataURL(new Blob(audioChunks, { type: audioRecorder.mimeType }));
+    }
+    setIsRecording(!isRecording);
+  };
+
   useEffect(() => {
     async function setupWebcamVideo() {
       if (!mediaStream) {
@@ -169,31 +213,42 @@ export default function WebcamVideo() {
 
   return (
     <div className="w-full h-full relative">
-      <video
-        className="h-full mx-auto"
-        ref={videoRef}
-        disablePictureInPicture
-        autoPlay
-        muted
-        onClick={
-          SCREENSHOT_ON_CLICK
-            ? (event) => {
-                let rect = videoRef.current!.getBoundingClientRect();
-                console.log(
-                  "Clicked at (" +
-                    (event.pageX - rect.left) +
-                    ", " +
-                    (event.clientY - rect.top) +
-                    ")"
-                );
-                console.log("Image: " + takeScreenshot());
-              }
-            : undefined
-        }
-      />
+      <div className="w-fit h-full mx-auto relative">
+        <video
+          ref={videoRef}
+          disablePictureInPicture
+          autoPlay
+          onClick={
+            SCREENSHOT_ON_CLICK
+              ? (event) => {
+                  let rect = videoRef.current!.getBoundingClientRect();
+                  console.log(
+                    "Clicked at (" +
+                      (event.pageX - rect.left) +
+                      ", " +
+                      (event.clientY - rect.top) +
+                      ")"
+                  );
+                  console.log("Image: " + takeScreenshot());
+                }
+              : undefined
+          }
+        />
+        <button
+          className="absolute bottom-0 right-0 bg-white text-black p-2"
+          onClick={toggleRecording}
+        >
+          {isRecording ? "Stop" : "Record"}
+        </button>
+      </div>
       <canvas
         className={"h-full mx-auto " + (SHOW_SCREENSHOT ? "block" : "hidden")}
         ref={canvasRef}
+      />
+      <audio
+        className={"h-full mx-auto " + (SHOW_AUDIO ? "block" : "hidden")}
+        ref={audioRef}
+        controls
       />
       <div>
         <h3>LLM Responses:</h3>
