@@ -5,15 +5,29 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     if (!body.imageData) {
-      return NextResponse.json(
-        { message: "No image data provided in chat api call" },
-        { status: 400 }
+      return new Response(
+        JSON.stringify({ message: "No image data provided in chat api call" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    const result = await sendMessage2LLM(body.imageData);
+    const streamGenerator = await sendMessage2LLM(body.imageData);
 
-    return NextResponse.json({ result });
+    const stream = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of streamGenerator.stream) {
+          const chunkText = chunk.text();
+          if (chunkText) {
+            controller.enqueue(chunkText);
+          }
+        }
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
   } catch (error) {
     console.error("Error accessing chat:", error);
     return NextResponse.json(
