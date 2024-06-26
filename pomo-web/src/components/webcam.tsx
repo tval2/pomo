@@ -8,6 +8,9 @@ const SCREENSHOT_CONTINUOUS = true;
 const SCREENSHOT_INTERVAL = 5000;
 
 export default function WebcamVideo() {
+  const [queue, setQueue] = useState<string[]>([]);
+  const [responses, setResponses] = useState<string[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [mediaStream, setMediaStream] = useState<MediaStream>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -39,6 +42,10 @@ export default function WebcamVideo() {
     }
   }, []);
 
+  const addToQueue = (imageData: string) => {
+    setQueue((prevQueue) => [...prevQueue, imageData]);
+  };
+
   const callLLM = async (imageData: string) => {
     if (!imageData) {
       console.error("No image data to send to callLLM");
@@ -46,7 +53,7 @@ export default function WebcamVideo() {
     }
 
     try {
-      const response = await fetch("/api/llm", {
+      const response = await fetch("/api/chat", {
         method: "POST",
         body: JSON.stringify({ imageData }),
         headers: {
@@ -64,9 +71,30 @@ export default function WebcamVideo() {
       const data = await response.json();
       return data.result;
     } catch (error) {
-      console.error("Error calling LLM API:", error);
+      console.error("Error calling chat API:", error);
     }
   };
+
+  const processQueue = useCallback(async () => {
+    if (queue.length === 0 || isProcessing) return;
+
+    setIsProcessing(true);
+    const imageData = queue[0];
+
+    try {
+      const response = await callLLM(imageData);
+      setResponses((prevResponses) => [...prevResponses, response]);
+      setQueue((prevQueue) => prevQueue.slice(1));
+    } catch (error) {
+      console.error("Error processing queue item:", error);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [queue, isProcessing]);
+
+  useEffect(() => {
+    processQueue();
+  }, [queue, processQueue]);
 
   useEffect(() => {
     async function setupWebcamVideo() {
@@ -93,12 +121,7 @@ export default function WebcamVideo() {
         const img = takeScreenshot();
         if (img) {
           console.log("Continuous Image taken");
-          try {
-            const response = await callLLM(img);
-            console.log("LLM Response:", response);
-          } catch (error) {
-            console.error("Error processing screenshot:", error);
-          }
+          addToQueue(img);
         } else {
           console.log("Failed to take cont. screenshot");
         }
@@ -140,6 +163,12 @@ export default function WebcamVideo() {
         className={"h-full mx-auto " + (SHOW_SCREENSHOT ? "block" : "hidden")}
         ref={canvasRef}
       />
+      <div>
+        <h3>LLM Responses:</h3>
+        {responses.map((response, index) => (
+          <p key={index}>{response}</p>
+        ))}
+      </div>
     </div>
   );
 }

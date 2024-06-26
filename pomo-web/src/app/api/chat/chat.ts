@@ -3,6 +3,7 @@ import {
   HarmCategory,
   HarmBlockThreshold,
 } from "@google/generative-ai";
+import { SYSTEM_PROMPT, SYSTEM_PROMPT_RESPONSE } from "./prompts";
 
 const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
 if (!apiKey) {
@@ -36,15 +37,38 @@ const safetySettings = [
   },
 ];
 
+function formatImage(imageData: string) {
+  return {
+    inlineData: {
+      mimeType: "image/png",
+      data: imageData,
+    },
+  };
+}
+
 const model = genAI.getGenerativeModel({
   model: "gemini-1.5-pro",
   safetySettings: safetySettings,
   generationConfig: generationConfig,
 });
 
-const prompt = "Describe this photo";
+const chat = model.startChat({
+  history: [
+    {
+      role: "user",
+      parts: [{ text: SYSTEM_PROMPT }],
+    },
+    {
+      role: "model",
+      parts: [{ text: SYSTEM_PROMPT_RESPONSE }],
+    },
+  ],
+  generationConfig: {
+    maxOutputTokens: 100,
+  },
+});
 
-export async function promptLLM(imageData: string) {
+export async function sendMessage2LLM(imageData: string) {
   if (!imageData) {
     throw new Error("No image data provided in promptLLM");
   }
@@ -55,15 +79,10 @@ export async function promptLLM(imageData: string) {
   }
 
   const base64Data = parts[1];
-  const imagePart = {
-    inlineData: {
-      mimeType: "image/png",
-      data: base64Data,
-    },
-  };
+  const imagePart = formatImage(base64Data);
 
   try {
-    const result = await model.generateContent([prompt, imagePart]);
+    const result = await chat.sendMessage([imagePart]);
     const response = result.response;
     return response.text();
   } catch (error) {
