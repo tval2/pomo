@@ -8,9 +8,9 @@ const SCREENSHOT_CONTINUOUS = true;
 const SCREENSHOT_INTERVAL = 2000;
 
 interface WebcamVideoProps {
-  onNewData: (data: string) => void,
-  onClick: (data: string, x: number, y: number) => void
-};
+  onNewData: (data: string) => void;
+  onClick: (data: string, x: number, y: number) => void;
+}
 
 export default function WebcamVideo(props: WebcamVideoProps) {
   const [mediaStream, setMediaStream] = useState<MediaStream>();
@@ -68,7 +68,6 @@ export default function WebcamVideo(props: WebcamVideoProps) {
       intervalId = setInterval(async () => {
         const img = takeScreenshot();
         if (img) {
-          // console.log("Continuous Image taken " + img);
           props.onNewData(img);
         } else {
           console.log("Failed to take cont. screenshot");
@@ -85,7 +84,8 @@ export default function WebcamVideo(props: WebcamVideoProps) {
 
   return (
     <div className="w-full h-full relative">
-      <video className="w-fit h-full mx-auto relative scale-x-[-1]"
+      <video
+        className="w-fit h-full mx-auto relative scale-x-[-1]"
         ref={videoRef}
         disablePictureInPicture
         autoPlay
@@ -95,7 +95,11 @@ export default function WebcamVideo(props: WebcamVideoProps) {
                 let img = takeScreenshot();
                 if (img) {
                   let rect = videoRef.current!.getBoundingClientRect();
-                  props.onClick(img, (event.pageX - rect.left), (event.clientY - rect.top));
+                  props.onClick(
+                    img,
+                    event.pageX - rect.left,
+                    event.clientY - rect.top
+                  );
                 }
               }
             : undefined
