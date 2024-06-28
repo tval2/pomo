@@ -1,50 +1,24 @@
-const audioContext = new (window.AudioContext ||
-  (window as any).webkitAudioContext)();
+export async function callTTS(text: string): Promise<AudioBuffer> {
+  try {
+    const response = await fetch("/api/tts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text }),
+    });
 
-export async function playAudioStream(url: string) {
-  const response = await fetch(url);
-  const reader = response.body!.getReader();
-  const stream = new ReadableStream({
-    start(controller) {
-      function push() {
-        reader.read().then(({ done, value }) => {
-          if (done) {
-            controller.close();
-            return;
-          }
-          controller.enqueue(value);
-          push();
-        });
-      }
-      push();
-    },
-  });
+    if (!response.ok) {
+      throw new Error("Failed to fetch audio");
+    }
 
-  const source = audioContext.createBufferSource();
-  const audioBuffer = await audioContext.decodeAudioData(
-    await streamToArrayBuffer(stream)
-  );
-  source.buffer = audioBuffer;
-  source.connect(audioContext.destination);
-  source.start();
-}
+    const arrayBuffer = await response.arrayBuffer();
+    const audioContext = new AudioContext();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-async function streamToArrayBuffer(
-  stream: ReadableStream<Uint8Array>
-): Promise<ArrayBuffer> {
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
+    return audioBuffer;
+  } catch (error) {
+    console.error("Error in text-to-speech:", error);
+    throw error;
   }
-  const size = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-  const buffer = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    buffer.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return buffer.buffer;
 }
