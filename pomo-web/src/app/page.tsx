@@ -1,9 +1,9 @@
-import WebcamVideo from "@/components/webcam";
+import Pomo from "@/components/pomo";
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <WebcamVideo />
+    <main className="flex min-h-screen flex-col items-center justify-between p-12">
+      <Pomo />
     </main>
   );
 }

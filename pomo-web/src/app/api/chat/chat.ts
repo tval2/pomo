@@ -37,11 +37,11 @@ const safetySettings = [
   },
 ];
 
-function formatImage(imageData: string) {
+function formatData(type: string, data: string) {
   return {
     inlineData: {
-      mimeType: "image/png",
-      data: imageData,
+      mimeType: type.includes("image") ? "image/png" : "audio/ogg",
+      data: data,
     },
   };
 }
@@ -68,21 +68,20 @@ const chat = model.startChat({
   },
 });
 
-export async function sendMessage2LLM(imageData: string) {
-  if (!imageData) {
+export async function sendMessage2LLM(data: string) {
+  if (!data) {
     throw new Error("No image data provided in promptLLM");
   }
 
-  const parts = imageData.split(",");
+  const parts = data.split(",");
   if (parts.length !== 2) {
-    throw new Error("Invalid image data format");
+    throw new Error("Invalid data format");
   }
 
-  const base64Data = parts[1];
-  const imagePart = formatImage(base64Data);
+  const dataPart = formatData(parts[0], parts[1]);
 
   try {
-    const result = await chat.sendMessageStream([imagePart]);
+    const result = await chat.sendMessageStream([dataPart]);
     return result;
   } catch (error) {
     console.error("Error generating content:", error);
