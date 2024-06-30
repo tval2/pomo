@@ -105,7 +105,6 @@ export default function WebcamVideo(props: WebcamVideoProps) {
         ctx.fillStyle = "rgba(18, 181, 203, 0.5)";
 
         let dt = (new Date().getTime() / 1000 - clickPos.t);
-        console.log(dt);
 
         maskData.map((value, index) => {
           const x = width - ((index + 1) % width);
