@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import { callLLM } from "../utils/llm";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
+import TextFeed from "./textfeed";
 
 export default function Pomo() {
   const [imageQueue, setImageQueue] = useState<string[]>([]);
@@ -12,6 +13,9 @@ export default function Pomo() {
     []
   );
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [sendPhotos, setSendPhotos] = useState(false);
+  const [sendAudio, setSendAudio] = useState(false);
   const responseId = useRef(0);
 
   const addToQueue = (data: string, imageOrAudio: boolean) => {
@@ -28,12 +32,19 @@ export default function Pomo() {
       if (queue.length === 0 || isProcessing) return;
 
       setIsProcessing(true);
-      const data = queue[0];
+      let data = queue[0];
+      if (!sendPhotos && data.startsWith("data:image")) {
+        data = "";
+      }
+      if (!sendAudio && data.startsWith("data:audio")) {
+        data = "";
+      }
 
       try {
         responseId.current = await callLLM(
           data,
           responseId.current,
+          isSpeaking,
           setResponses
         );
         if (imageOrAudio) {
@@ -58,8 +69,20 @@ export default function Pomo() {
     processQueue(false);
   }, [audioQueue, processQueue]);
 
+  const toggleSpeaking = () => {
+    setIsSpeaking(!isSpeaking);
+  };
+
+  const toggleSendPhotos = () => {
+    setSendPhotos(!sendPhotos);
+  };
+
+  const toggleSendAudio = () => {
+    setSendAudio(!sendAudio);
+  };
+
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full relative p-4">
       <WebcamVideo
         onNewData={(data: string) => {
           addToQueue(data, true);
@@ -74,27 +97,32 @@ export default function Pomo() {
         }}
       />
       <div>
-        <h3>LLM Responses:</h3>
-        <div className="overflow-y-auto max-h-64 flex flex-col-reverse">
-          {responses
-            .filter((el) => {
-              return el.text.trim() !== "$null$";
-            })
-            .toReversed()
-            .map((response) => (
-              <p key={response.id} className="message">
-                {response.text}
-              </p>
-            ))}
-        </div>
+        <button
+          className={`px-4 py-2 rounded ${
+            isSpeaking ? "bg-green-500" : "bg-red-500"
+          } text-white`}
+          onClick={toggleSpeaking}
+        >
+          {isSpeaking ? "TTS On" : "TTS Off"}
+        </button>
+        <button
+          className={`px-4 py-2 rounded ${
+            sendPhotos ? "bg-green-500" : "bg-red-500"
+          } text-white`}
+          onClick={toggleSendPhotos}
+        >
+          {sendPhotos ? "Sending images" : "Not sending images"}
+        </button>
+        <button
+          className={`px-4 py-2 rounded ${
+            sendAudio ? "bg-green-500" : "bg-red-500"
+          } text-white`}
+          onClick={toggleSendAudio}
+        >
+          {sendAudio ? "Sending audio" : "Not sending audio"}
+        </button>
       </div>
-      <style jsx>{`
-        .message {
-          white-space: pre-wrap;
-          margin-bottom: 0.5em;
-          padding: 0.5em;
-        }
-      `}</style>
+      <TextFeed responses={responses} />
     </div>
   );
 }
