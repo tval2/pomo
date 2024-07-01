@@ -38,12 +38,19 @@ const safetySettings = [
 ];
 
 function formatData(type: string, data: string) {
-  return {
-    inlineData: {
-      mimeType: type.includes("image") ? "image/png" : "audio/ogg",
-      data: data,
-    },
-  };
+  const mimeTypeMatch = type.match(/data:(.*?);base64/);
+  if (mimeTypeMatch) {
+    const mimeType = mimeTypeMatch[1];
+    console.log(mimeType);
+    return {
+      inlineData: {
+        mimeType: mimeType,
+        data: data,
+      },
+    };
+  } else {
+    throw new Error("No MIME type found");
+  }
 }
 
 const model = genAI.getGenerativeModel({
@@ -70,7 +77,7 @@ const chat = model.startChat({
 
 export async function sendMessage2LLM(data: string) {
   if (!data) {
-    throw new Error("No image data provided in promptLLM");
+    throw new Error("No data provided in promptLLM");
   }
 
   const parts = data.split(",");
