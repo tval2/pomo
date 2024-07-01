@@ -2,10 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 
-import {
-  InteractiveSegmenter,
-  FilesetResolver
-} from "@mediapipe/tasks-vision";
+import { InteractiveSegmenter, FilesetResolver } from "@mediapipe/tasks-vision";
 
 import useRequestAnimationFrame from "use-request-animation-frame";
 
@@ -22,7 +19,11 @@ interface WebcamVideoProps {
 export default function WebcamVideo(props: WebcamVideoProps) {
   const [mediaStream, setMediaStream] = useState<MediaStream>();
   const [segmenter, setSegmenter] = useState<InteractiveSegmenter>();
-  const [clickPos, setClickPos] = useState<{ x: number, y: number, t: number }>();
+  const [clickPos, setClickPos] = useState<{
+    x: number;
+    y: number;
+    t: number;
+  }>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const maskRef = useRef<HTMLCanvasElement>(null);
@@ -63,11 +64,12 @@ export default function WebcamVideo(props: WebcamVideoProps) {
       filesetResolver,
       {
         baseOptions: {
-          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/interactive_segmenter/magic_touch/float32/1/magic_touch.tflite",
-          delegate: "GPU"
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/interactive_segmenter/magic_touch/float32/1/magic_touch.tflite",
+          delegate: "GPU",
         },
         outputCategoryMask: true,
-        outputConfidenceMasks: false
+        outputConfidenceMasks: false,
       }
     );
     setSegmenter(interactiveSegmenter);
@@ -83,8 +85,8 @@ export default function WebcamVideo(props: WebcamVideoProps) {
       {
         keypoint: {
           x: 1.0 - clickPos.x / videoRef.current.videoWidth,
-          y: clickPos.y / videoRef.current.videoHeight
-        }
+          y: clickPos.y / videoRef.current.videoHeight,
+        },
       },
       (result) => {
         const mask = result.categoryMask;
@@ -104,15 +106,21 @@ export default function WebcamVideo(props: WebcamVideoProps) {
         ctx.fillRect(0, 0, width, height);
         ctx.fillStyle = "rgba(18, 181, 203, 0.5)";
 
-        let dt = (new Date().getTime() / 1000 - clickPos.t);
+        let dt = new Date().getTime() / 1000 - clickPos.t;
 
         maskData.map((value, index) => {
           const x = width - ((index + 1) % width);
           const y = (index + 1 - x) / width;
 
-          const dist = Math.sqrt((x - clickPos.x) * (x - clickPos.x) + (y - clickPos.y) * (y - clickPos.y));
+          const dist = Math.sqrt(
+            (x - clickPos.x) * (x - clickPos.x) +
+              (y - clickPos.y) * (y - clickPos.y)
+          );
           const PIXELS_IN_ONE_SECOND = 500;
-          if (Math.round(value * 255.0) === 0 && dist < PIXELS_IN_ONE_SECOND * dt) {
+          if (
+            Math.round(value * 255.0) === 0 &&
+            dist < PIXELS_IN_ONE_SECOND * dt
+          ) {
             ctx.fillRect(x, y, 1, 1);
           }
           return value;
@@ -122,7 +130,10 @@ export default function WebcamVideo(props: WebcamVideoProps) {
   }, [segmenter, videoRef, clickPos]);
 
   useRequestAnimationFrame(onFrame, {
-    shouldAnimate: (segmenter !== undefined && videoRef.current !== undefined && clickPos !== undefined)
+    shouldAnimate:
+      segmenter !== undefined &&
+      videoRef.current !== undefined &&
+      clickPos !== undefined,
   });
 
   useEffect(() => {
@@ -172,7 +183,8 @@ export default function WebcamVideo(props: WebcamVideoProps) {
   return (
     <div className="w-full h-full relative">
       <div className="flex justify-center">
-        <video className="w-fit h-full relative scale-x-[-1]"
+        <video
+          className="w-fit h-full relative scale-x-[-1]"
           ref={videoRef}
           disablePictureInPicture
           autoPlay
@@ -180,8 +192,8 @@ export default function WebcamVideo(props: WebcamVideoProps) {
             SCREENSHOT_ON_CLICK
               ? (event) => {
                   let rect = videoRef.current!.getBoundingClientRect();
-                  let x = (event.pageX - rect.left);
-                  let y = (event.clientY - rect.top);
+                  let x = event.pageX - rect.left;
+                  let y = event.clientY - rect.top;
 
                   let img = takeScreenshot();
                   if (img) {
@@ -202,7 +214,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
               : undefined
           }
         />
-        <canvas className="absolute pointer-events-none" ref={maskRef}/>
+        <canvas className="absolute pointer-events-none" ref={maskRef} />
       </div>
       <canvas
         className={"h-full mx-auto " + (SHOW_SCREENSHOT ? "block" : "hidden")}

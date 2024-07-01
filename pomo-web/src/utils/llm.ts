@@ -24,6 +24,7 @@ function playNextInQueue() {
 export async function callLLM(
   data: string,
   responseId: number,
+  isSpeaking: boolean,
   setResponses: (responses: (prevResponses: Response[]) => Response[]) => void
 ): Promise<number> {
   if (!data) {
@@ -65,7 +66,10 @@ export async function callLLM(
       buffer += chunk;
 
       // Process buffer when we have a full sentence / reach a word limit
-      if (buffer.includes(".") || buffer.split(" ").length > WORD_LIMIT) {
+      if (
+        (buffer.includes(".") || buffer.split(" ").length > WORD_LIMIT) &&
+        isSpeaking
+      ) {
         const audio = await callTTS(buffer);
         audioQueue.push(audio);
         buffer = "";
@@ -91,7 +95,7 @@ export async function callLLM(
       });
     }
 
-    if (buffer.trim()) {
+    if (buffer.trim() && isSpeaking) {
       const audio = await callTTS(buffer);
       audioQueue.push(audio);
       playNextInQueue();
