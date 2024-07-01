@@ -6,16 +6,28 @@ const SHOW_AUDIO = false;
 const CHUNK_INTERVAL = 100;
 const AUDIO_INTERVAL = 3000;
 
-function usePrevious(value: any) : any {
+function usePrevious(value: any): any {
   const ref = useRef();
   useEffect(() => {
     ref.current = value;
-  },[value]);
+  }, [value]);
   return ref.current;
 }
 
 interface WebcamAudioProps {
-  onNewData: (data: string) => void
+  onNewData: (data: string) => void;
+}
+
+const getSupportedMimeType = () => {
+  const possibleTypes = ["audio/webm", "audio/ogg", "audio/mp3", "audio/wav"];
+
+  for (const type of possibleTypes) {
+    if (MediaRecorder.isTypeSupported(type)) {
+      return type;
+    }
+  }
+
+  throw new Error("No supported MIME type found for MediaRecorder");
 };
 
 export default function WebcamAudio(props: WebcamAudioProps) {
@@ -60,11 +72,15 @@ export default function WebcamAudio(props: WebcamAudioProps) {
         } else {
           let audio = container.children[audioIndex] as HTMLAudioElement;
           audio.src = audioData;
-          setAudioIndex((audioIndex) => { return (audioIndex + 1) % MAX_AUDIO_ELEMENTS; });
+          setAudioIndex((audioIndex) => {
+            return (audioIndex + 1) % MAX_AUDIO_ELEMENTS;
+          });
         }
         props.onNewData(audioData);
-      }
-      reader.readAsDataURL(new Blob(prevChunks, { type: "audio/ogg" }));
+      };
+      reader.readAsDataURL(
+        new Blob(prevChunks, { type: getSupportedMimeType() })
+      );
     }
   }, [audioChunks, prevChunks]);
 
@@ -85,7 +101,8 @@ export default function WebcamAudio(props: WebcamAudioProps) {
         audioRecorder.stop();
       }
 
-      const recorder = new MediaRecorder(audioStream, { mimeType: "audio/ogg" });
+      const mimeType = getSupportedMimeType();
+      const recorder = new MediaRecorder(audioStream, { mimeType: mimeType });
       recorder.ondataavailable = (e) => {
         setAudioChunks((audioChunks) => [...audioChunks, e.data]);
       };
