@@ -19,10 +19,12 @@ interface WebcamAudioProps {
 };
 
 export default function WebcamAudio(props: WebcamAudioProps) {
+  const [audioStream, setAudioStream] = useState<MediaStream>();
   const [audioRecorder, setAudioRecorder] = useState<MediaRecorder>();
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const [audioIndex, setAudioIndex] = useState<number>(0);
   const prevChunks = usePrevious(audioChunks);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioContainerRef = useRef<HTMLDivElement>(null);
 
   const setupMediaStream = useCallback(async () => {
     try {
@@ -30,15 +32,7 @@ export default function WebcamAudio(props: WebcamAudioProps) {
         video: false,
         audio: true,
       });
-      const recorder = new MediaRecorder(as, { mimeType: "audio/ogg" });
-      recorder.ondataavailable = (e) => {
-        setAudioChunks((audioChunks) => [...audioChunks, e.data]);
-      };
-      recorder.onstop = () => {
-        setAudioChunks([]);
-      };
-      recorder.start(CHUNK_INTERVAL);
-      setAudioRecorder(recorder);
+      setAudioStream(as);
     } catch (e) {
       alert("Audio is disabled");
       throw e;
@@ -51,15 +45,24 @@ export default function WebcamAudio(props: WebcamAudioProps) {
       reader.onload = (e) => {
         let audioURL = e.target?.result;
         // console.log("New audio blob " + audioURL);
-        let audio = audioRef.current;
-        if (!audio || !audioURL) {
+        let container = audioContainerRef.current;
+        if (!container || !audioURL) {
           return;
         }
 
+        const MAX_AUDIO_ELEMENTS = 10;
         let audioData = audioURL as string;
-        // FIXME: audio data processing is disable until we fix audio streaming
-        // props.onNewData(audioData);
-        audio.src = audioData;
+        if (container.children.length < MAX_AUDIO_ELEMENTS) {
+          let audio = document.createElement("audio");
+          audio.controls = true;
+          audio.src = audioData;
+          container.appendChild(audio);
+        } else {
+          let audio = container.children[audioIndex] as HTMLAudioElement;
+          audio.src = audioData;
+          setAudioIndex((audioIndex) => { return (audioIndex + 1) % MAX_AUDIO_ELEMENTS; });
+        }
+        props.onNewData(audioData);
       }
       reader.readAsDataURL(new Blob(prevChunks, { type: "audio/ogg" }));
     }
@@ -67,19 +70,30 @@ export default function WebcamAudio(props: WebcamAudioProps) {
 
   useEffect(() => {
     async function setupWebcamAudio() {
-      if (!audioRecorder) {
+      if (!audioStream) {
         await setupMediaStream();
       }
     }
     setupWebcamAudio();
 
-    if (!audioRecorder) {
-      return;
-    }
-
     let interval = setInterval(() => {
-      audioRecorder.stop();
-      audioRecorder.start(AUDIO_INTERVAL);
+      if (!audioStream) {
+        return;
+      }
+
+      if (audioRecorder) {
+        audioRecorder.stop();
+      }
+
+      const recorder = new MediaRecorder(audioStream, { mimeType: "audio/ogg" });
+      recorder.ondataavailable = (e) => {
+        setAudioChunks((audioChunks) => [...audioChunks, e.data]);
+      };
+      recorder.onstop = () => {
+        setAudioChunks(() => []);
+      };
+      recorder.start(CHUNK_INTERVAL);
+      setAudioRecorder(() => recorder);
     }, AUDIO_INTERVAL);
 
     return () => {
@@ -87,13 +101,12 @@ export default function WebcamAudio(props: WebcamAudioProps) {
         clearInterval(interval);
       }
     };
-  }, [audioRecorder]);
+  }, [audioStream, audioRecorder]);
 
   return (
-    <audio
-      className={"h-full mx-auto " + (SHOW_AUDIO ? "block" : "hidden")}
-      ref={audioRef}
-      controls
+    <div
+      className={"w-fit h-full mx-auto " + (SHOW_AUDIO ? "block" : "hidden")}
+      ref={audioContainerRef}
     />
   );
 }
