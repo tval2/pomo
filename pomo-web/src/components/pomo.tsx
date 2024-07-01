@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import { callLLM } from "../utils/llm";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
+import TextFeed from "./textfeed";
 
 export default function Pomo() {
   const [imageQueue, setImageQueue] = useState<string[]>([]);
@@ -73,28 +74,7 @@ export default function Pomo() {
           addToQueue(data, false);
         }}
       />
-      <div>
-        <h3>LLM Responses:</h3>
-        <div className="overflow-y-auto max-h-64 flex flex-col-reverse">
-          {responses
-            .filter((el) => {
-              return el.text.trim() !== "$null$";
-            })
-            .toReversed()
-            .map((response) => (
-              <p key={response.id} className="message">
-                {response.text}
-              </p>
-            ))}
-        </div>
-      </div>
-      <style jsx>{`
-        .message {
-          white-space: pre-wrap;
-          margin-bottom: 0.5em;
-          padding: 0.5em;
-        }
-      `}</style>
+      <TextFeed responses={responses} />
     </div>
   );
 }
