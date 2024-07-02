@@ -1,4 +1,4 @@
-import { callTTS } from "./tts"; // You'll need to create this file
+import { streamTTS } from "./tts"; // You'll need to create this file
 
 type Response = { id: number; text: string };
 
@@ -85,8 +85,7 @@ export async function callLLM(
       ) {
         const cleanedText = cleanText(buffer);
         if (cleanedText) {
-          const audio = await callTTS(cleanedText);
-          audioQueue.push(audio);
+          streamTTS(cleanedText);
         }
 
         buffer = "";
@@ -113,9 +112,7 @@ export async function callLLM(
 
     const cleanedText = cleanText(buffer);
     if (cleanedText && isSpeaking) {
-      const audio = await callTTS(cleanedText);
-      audioQueue.push(audio);
-      playNextInQueue();
+      streamTTS(cleanedText);
     }
 
     return responseId + 1;
