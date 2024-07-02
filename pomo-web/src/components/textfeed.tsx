@@ -9,7 +9,8 @@ export default function TextFeed(props: TextFeedProps) {
       <div className="overflow-y-auto max-h-64 flex flex-col-reverse">
         {props.responses
           .filter((el) => {
-            return el.text.trim() !== "$null$";
+            const newEl = el.text.replace(/\$null\$/g, "").trim();
+            return newEl !== "";
           })
           .toReversed()
           .map((response) => (

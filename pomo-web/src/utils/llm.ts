@@ -21,6 +21,19 @@ function playNextInQueue() {
   }
 }
 
+function isEndOfSentence(text: string) {
+  const sentenceEndings = [".", "?", "!"];
+  return sentenceEndings.some((ending) => text.includes(ending));
+}
+
+function cleanText(text: string) {
+  return text
+    .replace(/\$null\$/g, "") // Remove $null$
+    .replace(/[\n\t\r]/g, " ") // Replace newlines, tabs, and carriage returns with a space
+    .replace(/\s+/g, " ") // Replace multiple spaces with a single space
+    .trim(); // Trim leading and trailing spaces
+}
+
 export async function callLLM(
   data: string,
   responseId: number,
@@ -67,13 +80,16 @@ export async function callLLM(
 
       // Process buffer when we have a full sentence / reach a word limit
       if (
-        (buffer.includes(".") || buffer.split(" ").length > WORD_LIMIT) &&
+        (isEndOfSentence(buffer) || buffer.split(" ").length > WORD_LIMIT) &&
         isSpeaking
       ) {
-        const audio = await callTTS(buffer);
-        audioQueue.push(audio);
-        buffer = "";
+        const cleanedText = cleanText(buffer);
+        if (cleanedText) {
+          const audio = await callTTS(cleanedText);
+          audioQueue.push(audio);
+        }
 
+        buffer = "";
         if (audioQueue.length === 1) {
           playNextInQueue();
         }
@@ -95,8 +111,9 @@ export async function callLLM(
       });
     }
 
-    if (buffer.trim() && isSpeaking) {
-      const audio = await callTTS(buffer);
+    const cleanedText = cleanText(buffer);
+    if (cleanedText && isSpeaking) {
+      const audio = await callTTS(cleanedText);
       audioQueue.push(audio);
       playNextInQueue();
     }

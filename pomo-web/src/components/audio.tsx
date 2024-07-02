@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 
 const SHOW_AUDIO = false;
 const CHUNK_INTERVAL = 100;
-const AUDIO_INTERVAL = 3000;
+const AUDIO_INTERVAL = 5000;
 
 function usePrevious(value: any): any {
   const ref = useRef();
@@ -32,7 +32,6 @@ const getSupportedMimeType = () => {
 
 export default function WebcamAudio(props: WebcamAudioProps) {
   const [audioStream, setAudioStream] = useState<MediaStream>();
-  const [audioRecorder, setAudioRecorder] = useState<MediaRecorder>();
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
   const [audioIndex, setAudioIndex] = useState<number>(0);
   const prevChunks = usePrevious(audioChunks);
@@ -53,30 +52,28 @@ export default function WebcamAudio(props: WebcamAudioProps) {
 
   useEffect(() => {
     if (audioChunks.length === 0 && prevChunks?.length > 0) {
-      var reader = new FileReader();
+      const reader = new FileReader();
       reader.onload = (e) => {
-        let audioURL = e.target?.result;
-        // console.log("New audio blob " + audioURL);
-        let container = audioContainerRef.current;
+        const audioURL = e.target?.result as string;
+        const container = audioContainerRef.current;
+
         if (!container || !audioURL) {
           return;
         }
 
         const MAX_AUDIO_ELEMENTS = 10;
-        let audioData = audioURL as string;
+
         if (container.children.length < MAX_AUDIO_ELEMENTS) {
-          let audio = document.createElement("audio");
+          const audio = document.createElement("audio");
           audio.controls = true;
-          audio.src = audioData;
+          audio.src = audioURL;
           container.appendChild(audio);
         } else {
-          let audio = container.children[audioIndex] as HTMLAudioElement;
-          audio.src = audioData;
-          setAudioIndex((audioIndex) => {
-            return (audioIndex + 1) % MAX_AUDIO_ELEMENTS;
-          });
+          const audio = container.children[audioIndex] as HTMLAudioElement;
+          audio.src = audioURL;
+          setAudioIndex((audioIndex) => (audioIndex + 1) % MAX_AUDIO_ELEMENTS);
         }
-        props.onNewData(audioData);
+        props.onNewData(audioURL);
       };
       reader.readAsDataURL(
         new Blob(prevChunks, { type: getSupportedMimeType() })
@@ -85,11 +82,11 @@ export default function WebcamAudio(props: WebcamAudioProps) {
   }, [audioChunks, prevChunks]);
 
   useEffect(() => {
-    async function setupWebcamAudio() {
+    const setupWebcamAudio = async () => {
       if (!audioStream) {
         await setupMediaStream();
       }
-    }
+    };
     setupWebcamAudio();
 
     let interval = setInterval(() => {
@@ -97,28 +94,28 @@ export default function WebcamAudio(props: WebcamAudioProps) {
         return;
       }
 
-      if (audioRecorder) {
-        audioRecorder.stop();
-      }
-
       const mimeType = getSupportedMimeType();
-      const recorder = new MediaRecorder(audioStream, { mimeType: mimeType });
+      const recorder = new MediaRecorder(audioStream, { mimeType });
+
       recorder.ondataavailable = (e) => {
         setAudioChunks((audioChunks) => [...audioChunks, e.data]);
       };
+
       recorder.onstop = () => {
-        setAudioChunks(() => []);
+        setAudioChunks([]);
       };
+
       recorder.start(CHUNK_INTERVAL);
-      setAudioRecorder(() => recorder);
+
+      setTimeout(() => {
+        recorder.stop();
+      }, AUDIO_INTERVAL);
     }, AUDIO_INTERVAL);
 
     return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
+      clearInterval(interval);
     };
-  }, [audioStream, audioRecorder]);
+  }, [audioStream]);
 
   return (
     <div
