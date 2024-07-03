@@ -6,10 +6,15 @@ import { InteractiveSegmenter, FilesetResolver } from "@mediapipe/tasks-vision";
 
 import useRequestAnimationFrame from "use-request-animation-frame";
 
+import { colorizeAndBlurMask } from "./shaders";
+
 const SHOW_SCREENSHOT = false;
 const SCREENSHOT_ON_CLICK = true;
 const SCREENSHOT_CONTINUOUS = true;
 const SCREENSHOT_INTERVAL = 2000;
+
+let hasSegmented = false;
+let clickTime: number;
 
 interface WebcamVideoProps {
   onNewData: (data: string) => void;
@@ -22,7 +27,6 @@ export default function WebcamVideo(props: WebcamVideoProps) {
   const [clickPos, setClickPos] = useState<{
     x: number;
     y: number;
-    t: number;
   }>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -68,8 +72,8 @@ export default function WebcamVideo(props: WebcamVideoProps) {
             "https://storage.googleapis.com/mediapipe-models/interactive_segmenter/magic_touch/float32/1/magic_touch.tflite",
           delegate: "GPU",
         },
-        outputCategoryMask: true,
-        outputConfidenceMasks: false,
+        outputCategoryMask: false,
+        outputConfidenceMasks: true,
       }
     );
     setSegmenter(interactiveSegmenter);
@@ -89,7 +93,15 @@ export default function WebcamVideo(props: WebcamVideoProps) {
         },
       },
       (result) => {
-        const mask = result.categoryMask;
+        // The model takes a few seconds to initialize the first time
+        // When we get our first successful result, treat that as the clickTime
+        // so we don't see a flash
+        if (!hasSegmented) {
+          clickTime = new Date().getTime() / 1000;
+          hasSegmented = true;
+        }
+
+        const mask = result.confidenceMasks![0]!;
         const canvas = maskRef.current;
         if (!mask || !canvas) {
           return;
@@ -97,34 +109,16 @@ export default function WebcamVideo(props: WebcamVideoProps) {
 
         const width = mask.width;
         const height = mask.height;
-        const maskData = mask.getAsFloat32Array();
         canvas.width = width;
         canvas.height = height;
 
-        const ctx = canvas.getContext("2d")!;
-        ctx.fillStyle = "#00000000";
-        ctx.fillRect(0, 0, width, height);
-        ctx.fillStyle = "rgba(18, 181, 203, 0.5)";
+        const ctx = canvas.getContext("webgl2")!;
 
-        let dt = new Date().getTime() / 1000 - clickPos.t;
+        const maskData = mask.getAsUint8Array();
+        let dt = new Date().getTime() / 1000 - clickTime;
+        let clickPosNorm = { x: (1.0 - clickPos.x / width), y: (1.0 - clickPos.y / height) };
 
-        maskData.map((value, index) => {
-          const x = width - ((index + 1) % width);
-          const y = (index + 1 - x) / width;
-
-          const dist = Math.sqrt(
-            (x - clickPos.x) * (x - clickPos.x) +
-              (y - clickPos.y) * (y - clickPos.y)
-          );
-          const PIXELS_IN_ONE_SECOND = 500;
-          if (
-            Math.round(value * 255.0) === 0 &&
-            dist < PIXELS_IN_ONE_SECOND * dt
-          ) {
-            ctx.fillRect(x, y, 1, 1);
-          }
-          return value;
-        });
+        colorizeAndBlurMask(ctx, width, height, maskData, dt, clickPosNorm);
       }
     );
   }, [segmenter, videoRef, clickPos]);
@@ -178,7 +172,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
         clearInterval(intervalId);
       }
     };
-  }, [mediaStream]);
+  }, [mediaStream, segmenter]);
 
   return (
     <div className="w-full h-full relative">
@@ -191,26 +185,26 @@ export default function WebcamVideo(props: WebcamVideoProps) {
           onClick={
             SCREENSHOT_ON_CLICK
               ? (event) => {
-                  let rect = videoRef.current!.getBoundingClientRect();
-                  let x = event.pageX - rect.left;
-                  let y = event.clientY - rect.top;
+                let rect = videoRef.current!.getBoundingClientRect();
+                let x = event.pageX - rect.left;
+                let y = event.clientY - rect.top;
 
-                  let img = takeScreenshot();
-                  if (img) {
-                    props.onClick(img, x, y);
-                  }
-
-                  setClickPos((clickPos) => {
-                    if (!clickPos) {
-                      return { x: x, y: y, t: new Date().getTime() / 1000 };
-                    } else {
-                      clickPos.x = x;
-                      clickPos.y = y;
-                      clickPos.t = new Date().getTime() / 1000;
-                      return clickPos;
-                    }
-                  });
+                let img = takeScreenshot();
+                if (img) {
+                  props.onClick(img, x, y);
                 }
+
+                clickTime = new Date().getTime() / 1000;
+                setClickPos((clickPos) => {
+                  if (!clickPos) {
+                    return { x: x, y: y };
+                  } else {
+                    clickPos.x = x;
+                    clickPos.y = y;
+                    return clickPos;
+                  }
+                });
+              }
               : undefined
           }
         />
