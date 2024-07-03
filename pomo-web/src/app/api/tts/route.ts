@@ -26,9 +26,11 @@ export async function POST(req: NextRequest) {
       headers: { "Content-Type": "audio/mpeg" },
     });
   } catch (error) {
-    console.error("Error accessing TTS.:", error);
+    const statusCode = (error as any).statusCode || "Unknown status code";
+    console.warn(`Warning: Error accessing TTS: Status code: ${statusCode}`);
+
     return NextResponse.json(
-      { message: "Error accessing TTS", error: (error as Error).message },
+      { message: "Error accessing TTS API", error: (error as Error).message },
       { status: 500 }
     );
   }

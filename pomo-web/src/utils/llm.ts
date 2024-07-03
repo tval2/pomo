@@ -1,23 +1,17 @@
-import { streamTTS } from "./tts"; // You'll need to create this file
+import { streamTTS, stopAudio } from "./tts"; // You'll need to create this file
 
 type Response = { id: number; text: string };
 
-let audioQueue: AudioBuffer[] = [];
+let audioQueue: string[] = [];
 let isPlaying = false;
-const WORD_LIMIT = 10;
 
-function playNextInQueue() {
+async function playNextInQueue() {
   if (audioQueue.length > 0 && !isPlaying) {
     isPlaying = true;
-    const audioContext = new AudioContext();
-    const source = audioContext.createBufferSource();
-    source.buffer = audioQueue.shift()!;
-    source.connect(audioContext.destination);
-    source.onended = () => {
-      isPlaying = false;
-      playNextInQueue();
-    };
-    source.start();
+    const text = audioQueue.shift()!;
+    await streamTTS(text);
+    isPlaying = false;
+    playNextInQueue();
   }
 }
 
@@ -28,10 +22,10 @@ function isEndOfSentence(text: string) {
 
 function cleanText(text: string) {
   return text
-    .replace(/\$null\$/g, "") // Remove $null$
-    .replace(/[\n\t\r]/g, " ") // Replace newlines, tabs, and carriage returns with a space
-    .replace(/\s+/g, " ") // Replace multiple spaces with a single space
-    .trim(); // Trim leading and trailing spaces
+    .replace(/\$null\$/g, "")
+    .replace(/[\n\t\r]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export async function callLLM(
@@ -74,24 +68,18 @@ export async function callLLM(
       const { done, value } = await reader.read();
       if (done) break;
 
-      const chunk = decoder.decode(value);
+      const chunk = cleanText(decoder.decode(value));
       accumulatedResponse += chunk;
       buffer += chunk;
 
-      // Process buffer when we have a full sentence / reach a word limit
-      if (
-        (isEndOfSentence(buffer) || buffer.split(" ").length > WORD_LIMIT) &&
-        isSpeaking
-      ) {
-        const cleanedText = cleanText(buffer);
-        if (cleanedText) {
-          streamTTS(cleanedText);
+      if (isEndOfSentence(buffer)) {
+        if (buffer && isSpeaking) {
+          audioQueue.push(buffer);
+          if (!isPlaying) {
+            playNextInQueue();
+          }
         }
-
         buffer = "";
-        if (audioQueue.length === 1) {
-          playNextInQueue();
-        }
       }
 
       setResponses((prevResponses: Response[]) => {
@@ -110,9 +98,11 @@ export async function callLLM(
       });
     }
 
-    const cleanedText = cleanText(buffer);
-    if (cleanedText && isSpeaking) {
-      streamTTS(cleanedText);
+    if (buffer && isSpeaking) {
+      audioQueue.push(buffer);
+      if (!isPlaying) {
+        playNextInQueue();
+      }
     }
 
     return responseId + 1;
@@ -120,4 +110,9 @@ export async function callLLM(
     console.error("Error calling chat API:", error);
     return responseId;
   }
+}
+
+export function stopLLMAudio() {
+  audioQueue = [];
+  stopAudio();
 }

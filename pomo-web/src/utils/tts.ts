@@ -1,8 +1,6 @@
 let audioContext: AudioContext | null = null;
-let audioQueue: ReadableStream[] = [];
-let isPlaying = false;
 
-export async function streamTTS(text: string) {
+export async function streamTTS(text: string): Promise<void> {
   if (typeof window === "undefined") {
     console.warn("streamTTS called in a non-browser environment");
     return;
@@ -18,7 +16,9 @@ export async function streamTTS(text: string) {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json();
+      console.error("Error accessing TTS:", errorData.message);
+      return;
     }
 
     if (!response.body) {
@@ -30,20 +30,13 @@ export async function streamTTS(text: string) {
         (window as any).webkitAudioContext)();
     }
 
-    if (!isPlaying && audioQueue.length === 0) {
-      // If nothing is playing and the queue is empty, start playing immediately
-      playAudioStream(response.body);
-    } else {
-      // Otherwise, add to the queue
-      audioQueue.push(response.body);
-    }
+    await playAudioStream(response.body);
   } catch (error) {
     console.error("Error streaming TTS:", error);
   }
 }
 
-async function playAudioStream(stream: ReadableStream) {
-  isPlaying = true;
+async function playAudioStream(stream: ReadableStream): Promise<void> {
   const reader = stream.getReader();
 
   try {
@@ -63,21 +56,12 @@ async function playAudioStream(stream: ReadableStream) {
     }
   } catch (error) {
     console.error("Error playing audio stream:", error);
-  } finally {
-    isPlaying = false;
-    playNextInQueue();
-  }
-}
-
-function playNextInQueue() {
-  if (audioQueue.length > 0) {
-    const nextStream = audioQueue.shift()!;
-    playAudioStream(nextStream);
   }
 }
 
 export function stopAudio() {
-  // Placeholder function for interruptions later
-  audioQueue = [];
-  isPlaying = false;
+  if (audioContext) {
+    audioContext.close();
+    audioContext = null;
+  }
 }
