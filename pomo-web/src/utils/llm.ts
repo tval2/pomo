@@ -1,30 +1,11 @@
-import { streamTTS, stopAudio } from "./tts"; // You'll need to create this file
-import { cleanTextPlayed, isEndOfSentence, processChunk } from "./helpers";
+import { queueAudioText, stopAudio } from "./tts";
+import { isEndOfSentence, processChunk } from "./helpers";
 
 type Response = { id: number; text: string };
-
-let audioQueue: string[] = [];
-let isPlaying = false;
-
-async function playNextInQueue() {
-  if (audioQueue.length > 0 && !isPlaying) {
-    isPlaying = true;
-    const text = audioQueue.shift()!;
-    try {
-      await streamTTS(text);
-    } catch (error) {
-      console.error("Error playing audio:", error);
-    } finally {
-      isPlaying = false;
-      playNextInQueue();
-    }
-  }
-}
 
 export async function callLLM(
   data: string,
   responseId: number,
-  isSpeaking: boolean,
   setResponses: (responses: (prevResponses: Response[]) => Response[]) => void
 ): Promise<number> {
   if (!data) {
@@ -67,12 +48,8 @@ export async function callLLM(
         buffer += processedChunk;
 
         if (isEndOfSentence(buffer)) {
-          const cleanedText = cleanTextPlayed(buffer);
-          if (cleanedText && isSpeaking) {
-            audioQueue.push(cleanedText);
-            if (!isPlaying) {
-              playNextInQueue();
-            }
+          if (buffer) {
+            queueAudioText(buffer);
           }
           buffer = "";
         }
@@ -91,11 +68,8 @@ export async function callLLM(
       }
     }
 
-    if (buffer && isSpeaking) {
-      audioQueue.push(buffer);
-      if (!isPlaying) {
-        playNextInQueue();
-      }
+    if (buffer) {
+      queueAudioText(buffer);
     }
 
     return responseId + 1;
@@ -106,6 +80,5 @@ export async function callLLM(
 }
 
 export function stopLLMAudio() {
-  audioQueue = [];
   stopAudio();
 }
