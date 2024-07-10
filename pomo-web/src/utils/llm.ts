@@ -1,4 +1,5 @@
 import { streamTTS, stopAudio } from "./tts"; // You'll need to create this file
+import { cleanTextPlayed, isEndOfSentence, processChunk } from "./helpers";
 
 type Response = { id: number; text: string };
 
@@ -9,23 +10,15 @@ async function playNextInQueue() {
   if (audioQueue.length > 0 && !isPlaying) {
     isPlaying = true;
     const text = audioQueue.shift()!;
-    await streamTTS(text);
-    isPlaying = false;
-    playNextInQueue();
+    try {
+      await streamTTS(text);
+    } catch (error) {
+      console.error("Error playing audio:", error);
+    } finally {
+      isPlaying = false;
+      playNextInQueue();
+    }
   }
-}
-
-function isEndOfSentence(text: string) {
-  const sentenceEndings = [".", "?", "!"];
-  return sentenceEndings.some((ending) => text.includes(ending));
-}
-
-function cleanText(text: string) {
-  return text
-    .replace(/\$null\$/g, "")
-    .replace(/[\n\t\r]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 export async function callLLM(
@@ -61,41 +54,41 @@ export async function callLLM(
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let accumulatedResponse = "";
     let buffer = "";
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const chunk = cleanText(decoder.decode(value));
-      accumulatedResponse += chunk;
-      buffer += chunk;
+      const chunk = decoder.decode(value);
+      const processedChunk = processChunk(chunk);
 
-      if (isEndOfSentence(buffer)) {
-        if (buffer && isSpeaking) {
-          audioQueue.push(buffer);
-          if (!isPlaying) {
-            playNextInQueue();
+      if (processedChunk) {
+        buffer += processedChunk;
+
+        if (isEndOfSentence(buffer)) {
+          const cleanedText = cleanTextPlayed(buffer);
+          if (cleanedText && isSpeaking) {
+            audioQueue.push(cleanedText);
+            if (!isPlaying) {
+              playNextInQueue();
+            }
           }
+          buffer = "";
         }
-        buffer = "";
-      }
 
-      setResponses((prevResponses: Response[]) => {
-        const lastResponse = prevResponses[prevResponses.length - 1];
-        if (lastResponse && lastResponse.id === responseId) {
-          return [
-            ...prevResponses.slice(0, -1),
-            { ...lastResponse, text: lastResponse.text + chunk },
-          ];
-        } else {
-          return [
-            ...prevResponses,
-            { id: responseId, text: accumulatedResponse },
-          ];
-        }
-      });
+        setResponses((prevResponses: Response[]) => {
+          const lastResponse = prevResponses[prevResponses.length - 1];
+          if (lastResponse && lastResponse.id === responseId) {
+            return [
+              ...prevResponses.slice(0, -1),
+              { ...lastResponse, text: lastResponse.text + processedChunk },
+            ];
+          } else {
+            return [...prevResponses, { id: responseId, text: processedChunk }];
+          }
+        });
+      }
     }
 
     if (buffer && isSpeaking) {

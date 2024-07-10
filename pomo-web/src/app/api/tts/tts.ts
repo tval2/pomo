@@ -2,6 +2,7 @@ import { ElevenLabsClient } from "elevenlabs";
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY2;
 const VOICE_ID = "ODq5zmih8GrVes37Dizd"; // Patrick;
+// let previousText = "";
 
 if (!ELEVENLABS_API_KEY) {
   throw new Error("ELEVENLABS_API_KEY is not set in environment variables");
@@ -24,8 +25,11 @@ export const createAudioStreamFromText = async (text: string) => {
     voice: "Patrick",
     model_id: "eleven_turbo_v2",
     text,
+    // previous_text: previousText,
     stream: true,
   });
+
+  // previousText += text;
 
   return audioStream;
 };

@@ -1,4 +1,8 @@
+import { cleanTextPlayed, isEndOfSentence } from "./helpers";
+
 let audioContext: AudioContext | null = null;
+let audioQueue: string[] = [];
+let isPlaying = false;
 
 export async function streamTTS(text: string): Promise<void> {
   if (typeof window === "undefined") {
@@ -30,38 +34,42 @@ export async function streamTTS(text: string): Promise<void> {
         (window as any).webkitAudioContext)();
     }
 
-    await playAudioStream(response.body);
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    await playAudioBuffer(audioBuffer);
   } catch (error) {
     console.error("Error streaming TTS:", error);
   }
 }
 
-async function playAudioStream(stream: ReadableStream): Promise<void> {
-  const reader = stream.getReader();
+async function playAudioBuffer(audioBuffer: AudioBuffer): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const source = audioContext!.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContext!.destination);
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    source.onended = () => resolve();
 
-      const audioBuffer = await audioContext!.decodeAudioData(value.buffer);
-      const source = audioContext!.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext!.destination);
+    const errorHandler = (e: Event) => {
+      audioContext!.removeEventListener("error", errorHandler);
+      reject(new Error("Audio playback error"));
+    };
+    audioContext!.addEventListener("error", errorHandler);
 
-      await new Promise<void>((resolve) => {
-        source.onended = () => resolve();
-        source.start();
-      });
+    try {
+      source.start();
+    } catch (error) {
+      reject(error);
     }
-  } catch (error) {
-    console.error("Error playing audio stream:", error);
-  }
+  });
 }
 
 export function stopAudio() {
+  audioQueue = [];
   if (audioContext) {
     audioContext.close();
     audioContext = null;
   }
+  isPlaying = false;
 }
