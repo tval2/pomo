@@ -1,16 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import axios from "axios";
-
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-const VOICE_ID = "ODq5zmih8GrVes37Dizd"; // Patrick;
-
-if (!ELEVENLABS_API_KEY) {
-  throw new Error("ELEVENLABS_API_KEY is not set in environment variables");
-}
-
-if (!VOICE_ID) {
-  throw new Error("ELEVENLABS_VOICE_ID is not set in environment variables");
-}
+import { createAudioStreamFromText } from "./tts";
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,32 +11,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const response = await axios({
-      method: "POST",
-      url: `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
-      headers: {
-        Accept: "audio/mpeg",
-        "xi-api-key": ELEVENLABS_API_KEY,
-        "Content-Type": "application/json",
+    const audioStream = await createAudioStreamFromText(body.text);
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of audioStream) {
+          controller.enqueue(chunk);
+        }
+        controller.close();
       },
-      data: {
-        text: body.text,
-        model_id: "eleven_monolingual_v1",
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.5,
-        },
-      },
-      responseType: "arraybuffer",
     });
 
-    return new Response(response.data, {
+    return new Response(stream, {
       headers: { "Content-Type": "audio/mpeg" },
     });
   } catch (error) {
-    console.error("Error accessing TTS.:", error);
+    const statusCode = (error as any).statusCode || "Unknown status code";
+    console.warn(`Warning: Error accessing TTS: Status code: ${statusCode}`);
+
     return NextResponse.json(
-      { message: "Error accessing TTS", error: (error as Error).message },
+      { message: "Error accessing TTS API", error: (error as Error).message },
       { status: 500 }
     );
   }

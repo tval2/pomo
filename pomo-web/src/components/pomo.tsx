@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useRef } from "react";
-import { callLLM } from "../utils/llm";
+import { callLLM, stopLLMAudio } from "../utils/llm";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
@@ -13,7 +13,7 @@ export default function Pomo() {
     []
   );
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [playAudio, setPlayAudio] = useState(false);
   const [sendPhotos, setSendPhotos] = useState(false);
   const [sendAudio, setSendAudio] = useState(false);
   const responseId = useRef(0);
@@ -44,7 +44,6 @@ export default function Pomo() {
         responseId.current = await callLLM(
           data,
           responseId.current,
-          isSpeaking,
           setResponses
         );
         if (imageOrAudio) {
@@ -69,8 +68,11 @@ export default function Pomo() {
     processQueue(false);
   }, [audioQueue, processQueue]);
 
-  const toggleSpeaking = () => {
-    setIsSpeaking(!isSpeaking);
+  const toggleAudio = () => {
+    if (playAudio) {
+      stopLLMAudio();
+    }
+    setPlayAudio(!playAudio);
   };
 
   const toggleSendPhotos = () => {
@@ -99,11 +101,11 @@ export default function Pomo() {
       <div>
         <button
           className={`px-4 py-2 rounded ${
-            isSpeaking ? "bg-green-500" : "bg-red-500"
+            playAudio ? "bg-green-500" : "bg-red-500"
           } text-white`}
-          onClick={toggleSpeaking}
+          onClick={toggleAudio}
         >
-          {isSpeaking ? "TTS On" : "TTS Off"}
+          {playAudio ? "TTS On" : "TTS Off"}
         </button>
         <button
           className={`px-4 py-2 rounded ${
