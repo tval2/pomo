@@ -4,20 +4,40 @@ let audioContext: AudioContext | null = null;
 
 interface QueueItem {
   text: string;
+  previousText?: string;
+  nextText?: string;
   audioBuffer?: AudioBuffer;
   status: "pending" | "fetching" | "ready" | "playing";
+  order: number;
 }
 
 let audioQueue: QueueItem[] = [];
 let isPlaying = false;
 let isFetching = false;
+let currentOrder = 0;
 
 const MAX_CONCURRENT_FETCHES = 3;
 
-export async function queueAudioText(text: string) {
+export async function queueAudioText(text: string, nextText?: string) {
   const cleanedText = cleanTextPlayed(text);
   if (cleanedText) {
-    audioQueue.push({ text: cleanedText, status: "pending" });
+    const newItem: QueueItem = {
+      text: cleanedText,
+      status: "pending",
+      order: currentOrder++,
+    };
+
+    if (audioQueue.length > 0) {
+      const previousItem = audioQueue[audioQueue.length - 1];
+      previousItem.nextText = cleanedText;
+      newItem.previousText = previousItem.text;
+    }
+
+    if (nextText) {
+      newItem.nextText = cleanTextPlayed(nextText);
+    }
+
+    audioQueue.push(newItem);
   }
 
   if (!isPlaying) {
@@ -50,7 +70,7 @@ async function fetchNextAudio() {
   item.status = "fetching";
 
   try {
-    const audioBuffer = await streamTTS(item.text);
+    const audioBuffer = await streamTTS(item);
     item.audioBuffer = audioBuffer;
     item.status = "ready";
 
@@ -65,7 +85,7 @@ async function fetchNextAudio() {
   fetchNextAudio();
 }
 
-export async function streamTTS(text: string): Promise<AudioBuffer> {
+export async function streamTTS(item: QueueItem): Promise<AudioBuffer> {
   if (typeof window === "undefined") {
     throw new Error("streamTTS called in a non-browser environment");
   }
@@ -80,7 +100,12 @@ export async function streamTTS(text: string): Promise<AudioBuffer> {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({
+      text: item.text,
+      previous_text: item.previousText,
+      next_text: item.nextText,
+      order: item.order,
+    }),
   });
 
   if (!response.ok) {
@@ -137,4 +162,5 @@ export function stopAudio() {
   }
   isPlaying = false;
   isFetching = false;
+  currentOrder = 0;
 }
