@@ -4,7 +4,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 
 const SHOW_AUDIO = false;
 const CHUNK_INTERVAL = 100;
-const AUDIO_INTERVAL = 5000;
+const AUDIO_INTERVAL = 4500;
 
 function usePrevious(value: any): any {
   const ref = useRef();
