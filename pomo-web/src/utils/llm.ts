@@ -3,12 +3,14 @@ import { isEndOfSentence, processChunk } from "./helpers";
 
 type Response = { id: number; text: string };
 
+export type LLMData = { audio?: string; image?: string };
+
 export async function callLLM(
-  data: string,
+  data: LLMData,
   responseId: number,
   setResponses: (responses: (prevResponses: Response[]) => Response[]) => void
 ): Promise<number> {
-  if (!data) {
+  if (!data || (!data.image && !data.audio)) {
     console.error("No data to send to callLLM");
     return responseId;
   }
@@ -16,7 +18,7 @@ export async function callLLM(
   try {
     const response = await fetch("/api/chat", {
       method: "POST",
-      body: JSON.stringify({ data }),
+      body: JSON.stringify(data),
       headers: {
         "Content-Type": "application/json",
       },

@@ -4,6 +4,7 @@ import {
   HarmBlockThreshold,
 } from "@google/generative-ai";
 import { SYSTEM_PROMPT, SYSTEM_PROMPT_RESPONSE } from "./prompts";
+import { LLMData } from "@/utils/llm";
 
 const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
 if (!apiKey) {
@@ -75,20 +76,32 @@ const chat = model.startChat({
   },
 });
 
-export async function sendMessage2LLM(data: string) {
+export async function sendMessage2LLM(data: LLMData) {
   if (!data) {
     throw new Error("No data provided in promptLLM");
   }
 
-  const parts = data.split(",");
-  if (parts.length !== 2) {
-    throw new Error("Invalid data format");
+  let messageData = [];
+  for (let propData of Object.values(data)) {
+    if (!propData) {
+      continue;
+    }
+
+    const parts = propData.split(",");
+    if (parts.length !== 2) {
+      throw new Error("Invalid data format");
+    }
+
+    const dataPart = formatData(parts[0], parts[1]);
+    messageData.push(dataPart);
   }
 
-  const dataPart = formatData(parts[0], parts[1]);
+  if (messageData.length === 0) {
+    throw new Error("Both image and audio data are empty in promptLLM");
+  }
 
   try {
-    const result = await chat.sendMessageStream([dataPart]);
+    const result = await chat.sendMessageStream(messageData);
     return result;
   } catch (error) {
     console.error("Error generating content:", error);
