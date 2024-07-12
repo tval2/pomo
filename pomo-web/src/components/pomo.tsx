@@ -1,10 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState, useRef } from "react";
-import { LLMData, callLLM, stopLLMAudio } from "../utils/llm";
+import { LLMData, callChat, callLLM, stopLLMAudio } from "../utils/llm";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
+
+enum DataType {
+  IMAGE = 0,
+  AUDIO,
+};
 
 export default function Pomo() {
   const [imageQueue, setImageQueue] = useState<string[]>([]);
@@ -12,17 +17,25 @@ export default function Pomo() {
   const [responses, setResponses] = useState<{ id: number; text: string }[]>(
     []
   );
+  const [clickResponses, setClickResponses] = useState<{ id: number; text: string }[]>(
+    []
+  );
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isClickProcessing, setIsClickProcessing] = useState(false);
   const [playAudio, setPlayAudio] = useState(false);
   const [sendPhotos, setSendPhotos] = useState(false);
   const [sendAudio, setSendAudio] = useState(false);
   const responseId = useRef(0);
+  const clickResponseId = useRef(0);
 
-  const addToQueue = (data: string, imageOrAudio: boolean) => {
-    if (imageOrAudio) {
-      setImageQueue((prevQueue) => [...prevQueue, data]);
-    } else {
-      setAudioQueue((prevQueue) => [...prevQueue, data]);
+  const addToQueue = (data: string, dataType: DataType) => {
+    switch (dataType) {
+      case DataType.IMAGE:
+        setImageQueue((prevQueue) => [...prevQueue, data]);
+        break;
+      case DataType.AUDIO:
+        setAudioQueue((prevQueue) => [...prevQueue, data]);
+        break;
     }
   };
 
@@ -39,7 +52,7 @@ export default function Pomo() {
     }
 
     try {
-      responseId.current = await callLLM(
+      responseId.current = await callChat(
         data,
         responseId.current,
         setResponses
@@ -52,6 +65,23 @@ export default function Pomo() {
       setIsProcessing(false);
     }
   }, [imageQueue, audioQueue, isProcessing, responseId]);
+
+  const processClick = useCallback(async (image: string, coords: string) => {
+    let data: LLMData = { image: image, text: coords };
+
+    setIsClickProcessing(true);
+    try {
+      clickResponseId.current = await callLLM(
+        data,
+        clickResponseId.current,
+        setClickResponses
+      );
+    } catch (error) {
+      console.error("Error processing click:", error);
+    } finally {
+      setIsClickProcessing(false);
+    }
+  }, [isClickProcessing, clickResponseId]);
 
   useEffect(() => {
     processQueue();
@@ -76,15 +106,15 @@ export default function Pomo() {
     <div className="w-full h-full relative p-4">
       <WebcamVideo
         onNewData={(data: string) => {
-          addToQueue(data, true);
+          addToQueue(data, DataType.IMAGE);
         }}
         onClick={(data: string, x: number, y: number) => {
-          // TODO: ask llm to identify the object at (x,y)
+          processClick(data, JSON.stringify({ x: x, y: y }));
         }}
       />
       <WebcamAudio
         onNewData={(data: string) => {
-          addToQueue(data, false);
+          addToQueue(data, DataType.AUDIO);
         }}
       />
       <div>
@@ -110,6 +140,12 @@ export default function Pomo() {
           {sendAudio ? "Sending audio" : "Not sending audio"}
         </button>
       </div>
+      {clickResponses.length > 0 ?
+        <p className="message mb-2 p-2">
+          {"Responding as: " + clickResponses[clickResponses.length - 1].text}
+        </p>
+        : null
+      }
       <TextFeed responses={responses} />
     </div>
   );

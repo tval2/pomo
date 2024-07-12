@@ -254,7 +254,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
 
                 let img = takeScreenshot();
                 if (img) {
-                  props.onClick(img, x, y);
+                  props.onClick(img, x / rect.width, y / rect.height);
                 }
 
                 clickTime = new Date().getTime() / 1000;
