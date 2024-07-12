@@ -4,39 +4,35 @@ let audioContext: AudioContext | null = null;
 
 interface QueueItem {
   text: string;
-  previousText?: string;
-  nextText?: string;
+  previousTexts: string[];
+  nextTexts: string[];
   audioBuffer?: AudioBuffer;
   status: "pending" | "fetching" | "ready" | "playing";
-  order: number;
+  index: number;
 }
 
 let audioQueue: QueueItem[] = [];
 let isPlaying = false;
 let isFetching = false;
-let currentOrder = 0;
+let currentIndex = 0;
+let previousTextsDict: { [key: number]: string } = {};
 
 const MAX_CONCURRENT_FETCHES = 3;
+const MAX_CONTEXT_ITEMS = 3;
 
-export async function queueAudioText(text: string, nextText?: string) {
+export async function queueAudioText(text: string) {
   const cleanedText = cleanTextPlayed(text);
   if (cleanedText) {
     const newItem: QueueItem = {
       text: cleanedText,
+      previousTexts: [],
+      nextTexts: [],
       status: "pending",
-      order: currentOrder++,
+      index: currentIndex++,
     };
 
-    if (audioQueue.length > 0) {
-      const previousItem = audioQueue[audioQueue.length - 1];
-      previousItem.nextText = cleanedText;
-      newItem.previousText = previousItem.text;
-    }
-
-    if (nextText) {
-      newItem.nextText = cleanTextPlayed(nextText);
-    }
-
+    previousTextsDict[newItem.index] = cleanedText;
+    updateContextForQueueItems(newItem);
     audioQueue.push(newItem);
   }
 
@@ -45,6 +41,25 @@ export async function queueAudioText(text: string, nextText?: string) {
   }
   if (!isFetching) {
     fetchNextAudio();
+  }
+}
+
+function updateContextForQueueItems(newItem: QueueItem) {
+  const curIdx = newItem.index;
+  const queueLength = audioQueue.length;
+  for (let i = 0; i < MAX_CONTEXT_ITEMS; i++) {
+    // add current item text to previous 3 (or whatever MAX_CONTEXT_ITEMS is) items' nextTexts
+    const idxP = queueLength - 1 - i;
+    if (idxP >= 0) {
+      const item = audioQueue[idxP];
+      item.nextTexts.push(newItem.text);
+    }
+
+    // add past 3 (or whatever MAX_CONTEXT_ITEMS is) items' text to current item's previousTexts
+    const idxN = curIdx - MAX_CONTEXT_ITEMS + i;
+    if (idxN > 0) {
+      newItem.previousTexts.push(previousTextsDict[idxN]);
+    }
   }
 }
 
@@ -102,9 +117,9 @@ export async function streamTTS(item: QueueItem): Promise<AudioBuffer> {
     },
     body: JSON.stringify({
       text: item.text,
-      previous_text: item.previousText,
-      next_text: item.nextText,
-      order: item.order,
+      previous_text: item.previousTexts.join(),
+      next_text: item.nextTexts.join(),
+      index: item.index,
     }),
   });
 
@@ -162,5 +177,5 @@ export function stopAudio() {
   }
   isPlaying = false;
   isFetching = false;
-  currentOrder = 0;
+  currentIndex = 0;
 }

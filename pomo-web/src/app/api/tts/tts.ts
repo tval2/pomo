@@ -1,4 +1,4 @@
-import { ElevenLabsClient } from "elevenlabs";
+import axios from "axios";
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY2;
 const VOICE_ID = "ODq5zmih8GrVes37Dizd"; // Patrick;
@@ -12,24 +12,37 @@ if (!VOICE_ID) {
   throw new Error("ELEVENLABS_VOICE_ID is not set in environment variables");
 }
 
-const client = new ElevenLabsClient({
-  apiKey: ELEVENLABS_API_KEY,
-});
+let previousRequestIds: { [key: number]: number } = {};
 
-export const createAudioStreamFromText = async (text: string) => {
+export const createAudioStreamFromText = async (
+  text: string,
+  previous_text: string,
+  next_text: string,
+  index: number
+) => {
   if (!text) {
     throw new Error("No text provided in TTS call");
   }
 
-  const audioStream = await client.generate({
-    voice: "Patrick",
-    model_id: "eleven_turbo_v2",
-    text,
-    // previous_text: previousText,
-    stream: true,
+  const response = await axios({
+    method: "POST",
+    url: `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream`,
+    headers: {
+      Accept: "audio/mpeg",
+      "xi-api-key": ELEVENLABS_API_KEY,
+      "Content-Type": "application/json",
+    },
+    data: {
+      model_id: "eleven_turbo_v2",
+      text: text,
+      previous_text: previous_text === "" ? undefined : previous_text,
+      next_text: next_text === "" ? undefined : next_text,
+    },
   });
 
-  // previousText += text;
+  console.log("response", typeof response.data, "\n $$$$$$ \n\n");
+  const audioStream = response.data;
 
+  // previousRequestIds[index] = audioStream.requestId;
   return audioStream;
 };
