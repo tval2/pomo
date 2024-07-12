@@ -3,6 +3,7 @@ import {
   HarmCategory,
   HarmBlockThreshold,
 } from "@google/generative-ai";
+import { LLMData } from "@/utils/llm";
 
 const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
 if (!apiKey) {
@@ -37,19 +38,28 @@ const safetySettings = [
 ];
 
 const model = genAI.getGenerativeModel({
-  model: "gemini-1.5-pro",
+  model: "gemini-1.5-flash-latest",
   safetySettings: safetySettings,
   generationConfig: generationConfig,
 });
 
-const prompt = "Describe this photo";
+const getPrompt = (coords: string) => {
+  return `Identify the object at the normalized pixel coordinates ${coords} in this
+  photo. Provide a succinct, simple description and nothing else. If the object is
+  part of a larger object, identify the larger object. For example, if the coordinates
+  are for someones hand or nose, and you can see more of the person, identify the person.`
+}
 
-export async function promptLLM(imageData: string) {
-  if (!imageData) {
-    throw new Error("No image data provided in promptLLM");
+export async function promptLLM(data: LLMData) {
+  if (!data) {
+    throw new Error("No data provided in promptLLM");
   }
 
-  const parts = imageData.split(",");
+  if (!data.image || !data.text) {
+    throw new Error("Missing image or text in promptLLM");
+  }
+
+  const parts = data.image.split(",");
   if (parts.length !== 2) {
     throw new Error("Invalid image data format");
   }
@@ -63,7 +73,7 @@ export async function promptLLM(imageData: string) {
   };
 
   try {
-    const result = await model.generateContent([prompt, imagePart]);
+    const result = await model.generateContent([getPrompt(data.text), imagePart]);
     const response = result.response;
     return response.text();
   } catch (error) {

@@ -4,14 +4,14 @@ import { promptLLM } from "./llm";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    if (!body.imageData) {
-      return NextResponse.json(
-        { message: "No image data provided in llm api call" },
-        { status: 400 }
+    if (!body) {
+      return new Response(
+        JSON.stringify({ message: "No data provided in chat api call" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    const result = await promptLLM(body.imageData);
+    const result = await promptLLM(body);
 
     return NextResponse.json({ result });
   } catch (error) {

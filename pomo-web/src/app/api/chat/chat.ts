@@ -39,10 +39,10 @@ const safetySettings = [
 ];
 
 function formatData(type: string, data: string) {
-  const mimeTypeMatch = type.match(/data:(.*?);base64/);
-  if (mimeTypeMatch) {
-    const mimeType = mimeTypeMatch[1];
-    console.log(mimeType);
+  const mimeType64Match = type.match(/data:(.*?);base64/);
+  const mimeTypeMatch = type.match(/data:(.*?)/);
+  if (mimeType64Match || mimeTypeMatch) {
+    const mimeType = (mimeType64Match ?? mimeTypeMatch)![1];
     return {
       inlineData: {
         mimeType: mimeType,
@@ -78,7 +78,7 @@ const chat = model.startChat({
 
 export async function sendMessage2LLM(data: LLMData) {
   if (!data) {
-    throw new Error("No data provided in promptLLM");
+    throw new Error("No data provided in sendMessage2LLM");
   }
 
   let messageData = [];
@@ -87,17 +87,21 @@ export async function sendMessage2LLM(data: LLMData) {
       continue;
     }
 
-    const parts = propData.split(",");
-    if (parts.length !== 2) {
-      throw new Error("Invalid data format");
-    }
+    if (propData.startsWith("data")) {
+      const parts = propData.split(",");
+      if (parts.length !== 2) {
+        throw new Error("Invalid data format");
+      }
 
-    const dataPart = formatData(parts[0], parts[1]);
-    messageData.push(dataPart);
+      const dataPart = formatData(parts[0], parts[1]);
+      messageData.push(dataPart);
+    } else {
+      messageData.push(propData);
+    }
   }
 
   if (messageData.length === 0) {
-    throw new Error("Both image and audio data are empty in promptLLM");
+    throw new Error("All props are empty in sendMessage2LLM");
   }
 
   try {
