@@ -13,7 +13,7 @@
     "@mediapipe/tasks-vision": "^0.10.14",
     "@techstark/opencv-js": "^4.9.0-release.3",
     "axios": "^1.7.2",
-    "elevenlabs": "^0.8.2",
+    "elevenlabs": "^0.9.1",
     "next": "14.2.4",
     "react": "^18",
     "react-dom": "^18",

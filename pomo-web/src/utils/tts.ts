@@ -117,8 +117,8 @@ export async function streamTTS(item: QueueItem): Promise<AudioBuffer> {
     },
     body: JSON.stringify({
       text: item.text,
-      previous_text: item.previousTexts.join(),
-      next_text: item.nextTexts.join(),
+      previous_texts: item.previousTexts,
+      next_texts: item.nextTexts,
       index: item.index,
     }),
   });
