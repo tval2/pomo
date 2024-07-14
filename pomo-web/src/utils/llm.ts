@@ -9,7 +9,6 @@ export async function callLLM(
   setResponses: (responses: (prevResponses: Response[]) => Response[]) => void
 ): Promise<number> {
   if (!data) {
-    console.error("No data to send to callLLM");
     return responseId;
   }
 

@@ -17,6 +17,7 @@ const client = new ElevenLabsClient({
 });
 
 let previousRequestIds: { [key: number]: string } = {};
+let previousRequestIdsReverse: { [key: string]: number } = {};
 
 function getLastThreeIds(index: number, previous_texts: string[]): string[] {
   const start = Math.max(0, index - 3);
@@ -48,7 +49,14 @@ const fetchRequestID = async (index: number) => {
 
     if (response.status === 200) {
       const history = response.data.history;
-      previousRequestIds[index] = history[history.length - 1].request_id;
+      const requestId = history[history.length - 1].request_id;
+      if (requestId in previousRequestIdsReverse) {
+        previousRequestIds[index] = requestId;
+        previousRequestIdsReverse[requestId] = index;
+      } else {
+        previousRequestIds[index] = requestId;
+        previousRequestIdsReverse[requestId] = index;
+      }
     } else {
       console.error(`Failed to fetch history. Status: ${response.status}`);
     }
@@ -69,19 +77,32 @@ export const createAudioStreamFromText = async (
 
   const previous_request_ids = getLastThreeIds(index, previous_texts);
 
-  const audioStream = await client.generate({
-    voice: "Patrick",
-    model_id: "eleven_turbo_v2",
-    text: text,
-    previous_text:
-      previous_texts.length === 0 ? undefined : previous_texts.join(" "),
-    next_text: next_texts.length === 0 ? undefined : next_texts.join(" "),
-    previous_request_ids:
-      previous_request_ids.length === 0 ? undefined : previous_request_ids,
-    stream: true,
+  // const audioStream = await client.generate({
+  //   voice: "Patrick",
+  //   model_id: "eleven_turbo_v2",
+  //   text: text,
+  //   previous_text:
+  //     previous_texts.length === 0 ? undefined : previous_texts.join(" "),
+  //   next_text: next_texts.length === 0 ? undefined : next_texts.join(" "),
+  //   previous_request_ids:
+  //     previous_request_ids.length === 0 ? undefined : previous_request_ids,
+  //   stream: true,
+  // });
+
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "xi-api-key": ELEVENLABS_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      text: text,
+      model_id: "eleven_turbo_v2",
+    }),
   });
-
-  await fetchRequestID(index).catch(console.error);
-
+  const id = response.headers.get("request-id");
+  console.log("Response ID:", id);
+  const audioStream = response.body;
   return audioStream;
 };
