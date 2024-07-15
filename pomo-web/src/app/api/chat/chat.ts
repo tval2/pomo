@@ -4,6 +4,7 @@ import {
   HarmBlockThreshold,
 } from "@google/generative-ai";
 import { SYSTEM_PROMPT, SYSTEM_PROMPT_RESPONSE } from "./prompts";
+import { LLMData } from "@/utils/llm";
 
 const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
 if (!apiKey) {
@@ -38,10 +39,10 @@ const safetySettings = [
 ];
 
 function formatData(type: string, data: string) {
-  const mimeTypeMatch = type.match(/data:(.*?);base64/);
-  if (mimeTypeMatch) {
-    const mimeType = mimeTypeMatch[1];
-    console.log(mimeType);
+  const mimeType64Match = type.match(/data:(.*?);base64/);
+  const mimeTypeMatch = type.match(/data:(.*?)/);
+  if (mimeType64Match || mimeTypeMatch) {
+    const mimeType = (mimeType64Match ?? mimeTypeMatch)![1];
     return {
       inlineData: {
         mimeType: mimeType,
@@ -75,20 +76,36 @@ const chat = model.startChat({
   },
 });
 
-export async function sendMessage2LLM(data: string) {
+export async function sendMessage2LLM(data: LLMData) {
   if (!data) {
-    throw new Error("No data provided in promptLLM");
+    throw new Error("No data provided in sendMessage2LLM");
   }
 
-  const parts = data.split(",");
-  if (parts.length !== 2) {
-    throw new Error("Invalid data format");
+  let messageData = [];
+  for (let propData of Object.values(data)) {
+    if (!propData) {
+      continue;
+    }
+
+    if (propData.startsWith("data")) {
+      const parts = propData.split(",");
+      if (parts.length !== 2) {
+        throw new Error("Invalid data format");
+      }
+
+      const dataPart = formatData(parts[0], parts[1]);
+      messageData.push(dataPart);
+    } else {
+      messageData.push(propData);
+    }
   }
 
-  const dataPart = formatData(parts[0], parts[1]);
+  if (messageData.length === 0) {
+    throw new Error("All props are empty in sendMessage2LLM");
+  }
 
   try {
-    const result = await chat.sendMessageStream([dataPart]);
+    const result = await chat.sendMessageStream(messageData);
     return result;
   } catch (error) {
     console.error("Error generating content:", error);

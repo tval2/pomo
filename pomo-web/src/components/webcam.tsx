@@ -11,7 +11,7 @@ import { colorizeAndBlurMask } from "./shaders";
 const SHOW_SCREENSHOT = false;
 const SCREENSHOT_ON_CLICK = true;
 const SCREENSHOT_CONTINUOUS = true;
-const SCREENSHOT_INTERVAL = 2000;
+const SCREENSHOT_INTERVAL = 4500;
 const SHOW_CLICK_POS = true;
 
 // Parameters for Lucas-Kanade optical flow
@@ -254,7 +254,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
 
                 let img = takeScreenshot();
                 if (img) {
-                  props.onClick(img, x, y);
+                  props.onClick(img, x / rect.width, y / rect.height);
                 }
 
                 clickTime = new Date().getTime() / 1000;

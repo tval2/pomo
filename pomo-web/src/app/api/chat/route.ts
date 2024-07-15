@@ -4,14 +4,14 @@ import { sendMessage2LLM } from "./chat";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    if (!body.data) {
+    if (!body) {
       return new Response(
         JSON.stringify({ message: "No data provided in chat api call" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    const streamGenerator = await sendMessage2LLM(body.data);
+    const streamGenerator = await sendMessage2LLM(body);
 
     const stream = new ReadableStream({
       async start(controller) {
