@@ -46,10 +46,8 @@ export async function callLLM(
       if (processedChunk) {
         buffer += processedChunk;
 
-        if (isEndOfSentence(buffer)) {
-          if (buffer) {
-            queueAudioText(buffer);
-          }
+        if (isEndOfSentence(buffer) && buffer) {
+          queueAudioText(buffer);
           buffer = "";
         }
 

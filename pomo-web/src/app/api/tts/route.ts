@@ -3,7 +3,7 @@ import { createAudioStreamFromText } from "./tts";
 
 export async function POST(req: NextRequest) {
   try {
-    const { text, previous_texts, next_texts, index } = await req.json();
+    const { text, next_texts, index } = await req.json();
     if (!text) {
       return new Response(
         JSON.stringify({ message: "Text data provided in TTS api call" }),
@@ -13,17 +13,23 @@ export async function POST(req: NextRequest) {
 
     const audioStream = await createAudioStreamFromText(
       text,
-      previous_texts,
       next_texts,
       index
     );
 
-    const stream = new ReadableStream({
+    const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
-        for await (const chunk of audioStream) {
-          controller.enqueue(chunk);
+        const reader = audioStream.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            controller.enqueue(value);
+          }
+        } finally {
+          reader.releaseLock();
+          controller.close();
         }
-        controller.close();
       },
     });
 

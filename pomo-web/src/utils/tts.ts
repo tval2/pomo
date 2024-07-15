@@ -4,7 +4,6 @@ let audioContext: AudioContext | null = null;
 
 interface QueueItem {
   text: string;
-  previousTexts: string[];
   nextTexts: string[];
   audioBuffer?: AudioBuffer;
   status: "pending" | "fetching" | "ready" | "playing";
@@ -15,7 +14,6 @@ let audioQueue: QueueItem[] = [];
 let isPlaying = false;
 let isFetching = false;
 let currentIndex = 0;
-let previousTextsDict: { [key: number]: string } = {};
 
 const MAX_CONCURRENT_FETCHES = 3;
 const MAX_CONTEXT_ITEMS = 3;
@@ -25,13 +23,11 @@ export async function queueAudioText(text: string) {
   if (cleanedText) {
     const newItem: QueueItem = {
       text: cleanedText,
-      previousTexts: [],
       nextTexts: [],
       status: "pending",
       index: currentIndex++,
     };
 
-    previousTextsDict[newItem.index] = cleanedText;
     updateContextForQueueItems(newItem);
     audioQueue.push(newItem);
   }
@@ -44,22 +40,14 @@ export async function queueAudioText(text: string) {
   }
 }
 
-function updateContextForQueueItems(newItem: QueueItem) {
-  const curIdx = newItem.index;
+// add current item text to previous 3 (or whatever MAX_CONTEXT_ITEMS is) items' nextTexts
+function updateContextForQueueItems(newItem: QueueItem): void {
   const queueLength = audioQueue.length;
-  for (let i = 0; i < MAX_CONTEXT_ITEMS; i++) {
-    // add current item text to previous 3 (or whatever MAX_CONTEXT_ITEMS is) items' nextTexts
-    const idxP = queueLength - 1 - i;
-    if (idxP >= 0) {
-      const item = audioQueue[idxP];
-      item.nextTexts.push(newItem.text);
-    }
+  const contextItemsCount = Math.min(MAX_CONTEXT_ITEMS, queueLength);
 
-    // add past 3 (or whatever MAX_CONTEXT_ITEMS is) items' text to current item's previousTexts
-    const idxN = curIdx - MAX_CONTEXT_ITEMS + i;
-    if (idxN > 0) {
-      newItem.previousTexts.push(previousTextsDict[idxN]);
-    }
+  for (let i = 0; i < contextItemsCount; i++) {
+    const index = queueLength - 1 - i;
+    audioQueue[index].nextTexts.push(newItem.text);
   }
 }
 
@@ -117,7 +105,6 @@ export async function streamTTS(item: QueueItem): Promise<AudioBuffer> {
     },
     body: JSON.stringify({
       text: item.text,
-      previous_texts: item.previousTexts,
       next_texts: item.nextTexts,
       index: item.index,
     }),

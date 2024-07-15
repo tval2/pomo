@@ -1,5 +1,11 @@
-import { ElevenLabsClient } from "elevenlabs";
-import axios from "axios";
+interface IdTextPair {
+  id: string;
+  text: string;
+}
+
+interface ResponseDictionary {
+  [index: number]: IdTextPair;
+}
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY3;
 const VOICE_ID = "ODq5zmih8GrVes37Dizd"; // Patrick;
@@ -12,97 +18,70 @@ if (!VOICE_ID) {
   throw new Error("ELEVENLABS_VOICE_ID is not set in environment variables");
 }
 
-const client = new ElevenLabsClient({
-  apiKey: ELEVENLABS_API_KEY,
-});
-
-let previousRequestIds: { [key: number]: string } = {};
-let previousRequestIdsReverse: { [key: string]: number } = {};
-
-function getLastThreeIds(index: number, previous_texts: string[]): string[] {
-  const start = Math.max(0, index - 3);
-  const array_ids = Array.from(
-    { length: index - start },
-    (_, i) => previousRequestIds[start + i]
-  ).filter((id) => id !== undefined);
-
-  if (previous_texts.length != array_ids.length) {
-    return [];
-  }
-
-  return array_ids;
-}
-
-const fetchRequestID = async (index: number) => {
-  // TODO: need to update this in 2 ways:
-  //  1. hopefully ElevenLabs fixes their SDK to return the request ID
-  //  2. if not, and if multiple users are using this then need to find a way to associate the request ID with the correct user
-  try {
-    const response = await axios({
-      method: "GET",
-      url: "https://api.elevenlabs.io/v1/history",
-      headers: {
-        "xi-api-key": ELEVENLABS_API_KEY,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (response.status === 200) {
-      const history = response.data.history;
-      const requestId = history[history.length - 1].request_id;
-      if (requestId in previousRequestIdsReverse) {
-        previousRequestIds[index] = requestId;
-        previousRequestIdsReverse[requestId] = index;
-      } else {
-        previousRequestIds[index] = requestId;
-        previousRequestIdsReverse[requestId] = index;
-      }
-    } else {
-      console.error(`Failed to fetch history. Status: ${response.status}`);
-    }
-  } catch (error) {
-    console.error("Error fetching request ID:", error);
-  }
+const headers = {
+  "xi-api-key": ELEVENLABS_API_KEY,
+  "Content-Type": "application/json",
 };
+const url = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream`;
+
+let previousResponses: ResponseDictionary = {};
+
+function getLastThreeIds(index: number): { ids: string[]; texts: string[] } {
+  const start = Math.max(0, index - 3);
+  const ids: string[] = [];
+  const texts: string[] = [];
+
+  for (let i = start; i < index; i++) {
+    const response = previousResponses[i];
+    if (!response) {
+      throw new Error(`Response at index ${i} is undefined`);
+    }
+    if (response.id == null) {
+      throw new Error(`ID at index ${i} is null or undefined`);
+    }
+    if (response.text == null) {
+      throw new Error(`Text at index ${i} is null or undefined`);
+    }
+
+    ids.push(response.id);
+    texts.push(response.text);
+  }
+
+  return { ids, texts };
+}
 
 export const createAudioStreamFromText = async (
   text: string,
-  previous_texts: string[],
   next_texts: string[],
   index: number
-) => {
+): Promise<ReadableStream<Uint8Array>> => {
   if (!text) {
     throw new Error("No text provided in TTS call");
   }
 
-  const previous_request_ids = getLastThreeIds(index, previous_texts);
+  const { ids: prev_ids, texts: prev_texts } = getLastThreeIds(index);
 
-  // const audioStream = await client.generate({
-  //   voice: "Patrick",
-  //   model_id: "eleven_turbo_v2",
-  //   text: text,
-  //   previous_text:
-  //     previous_texts.length === 0 ? undefined : previous_texts.join(" "),
-  //   next_text: next_texts.length === 0 ? undefined : next_texts.join(" "),
-  //   previous_request_ids:
-  //     previous_request_ids.length === 0 ? undefined : previous_request_ids,
-  //   stream: true,
-  // });
+  const options = {
+    model_id: "eleven_turbo_v2",
+    text: text,
+    previous_text: prev_texts.length == 0 ? undefined : prev_texts.join(" "),
+    next_text: next_texts.length == 0 ? undefined : next_texts.join(" "),
+    previous_request_ids: prev_ids.length == 0 ? undefined : prev_ids,
+  };
 
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream`;
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "xi-api-key": ELEVENLABS_API_KEY,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      text: text,
-      model_id: "eleven_turbo_v2",
-    }),
+    headers: headers,
+    body: JSON.stringify(options),
   });
+
   const id = response.headers.get("request-id");
-  console.log("Response ID:", id);
-  const audioStream = response.body;
-  return audioStream;
+
+  if (!response.ok || !id || !response.body) {
+    throw new Error("No response body or ID received from ElevenLabs API");
+  }
+
+  previousResponses[index] = { id: id, text: text };
+
+  return response.body;
 };
