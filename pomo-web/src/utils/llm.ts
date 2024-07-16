@@ -3,7 +3,7 @@ import { isEndOfSentence, processChunk } from "./helpers";
 
 type Response = { id: number; text: string };
 
-export type LLMData = { audio?: string; image?: string, text?: string };
+export type LLMData = { audio?: string; image?: string; text?: string };
 
 export async function callChat(
   data: LLMData,
@@ -11,7 +11,6 @@ export async function callChat(
   setResponses: (responses: (prevResponses: Response[]) => Response[]) => void
 ): Promise<number> {
   if (!data || (!data.image && !data.audio && !data.text)) {
-    console.error("No data to send to callChat");
     return responseId;
   }
 
@@ -49,10 +48,8 @@ export async function callChat(
       if (processedChunk) {
         buffer += processedChunk;
 
-        if (isEndOfSentence(buffer)) {
-          if (buffer) {
-            queueAudioText(buffer);
-          }
+        if (isEndOfSentence(buffer) && buffer) {
+          queueAudioText(buffer);
           buffer = "";
         }
 

@@ -4,20 +4,48 @@ let audioContext: AudioContext | null = null;
 
 interface QueueItem {
   text: string;
+  nextTexts: string[];
   audioBuffer?: AudioBuffer;
   status: "pending" | "fetching" | "ready" | "playing";
+  index: number;
+  createdAt: number;
 }
 
 let audioQueue: QueueItem[] = [];
 let isPlaying = false;
 let isFetching = false;
+let currentIndex = 0;
+let lastActivityTimestamp = Date.now();
 
 const MAX_CONCURRENT_FETCHES = 3;
+const MAX_CONTEXT_ITEMS = 3;
+const MIN_NEXT_TEXTS = 1;
+const MAX_WAIT_TIME = 3000;
+const INACTIVITY_THRESHOLD = 10000;
+
+function isSentenceEnding(text: string): boolean {
+  const trimmedText = text.trim();
+  return (
+    trimmedText.endsWith(".") ||
+    trimmedText.endsWith("?") ||
+    trimmedText.endsWith("!")
+  );
+}
 
 export async function queueAudioText(text: string) {
   const cleanedText = cleanTextPlayed(text);
   if (cleanedText) {
-    audioQueue.push({ text: cleanedText, status: "pending" });
+    const newItem: QueueItem = {
+      text: cleanedText,
+      nextTexts: [],
+      status: "pending",
+      index: currentIndex++,
+      createdAt: Date.now(),
+    };
+
+    updateContextForQueueItems(newItem);
+    audioQueue.push(newItem);
+    lastActivityTimestamp = Date.now();
   }
 
   if (!isPlaying) {
@@ -25,6 +53,17 @@ export async function queueAudioText(text: string) {
   }
   if (!isFetching) {
     fetchNextAudio();
+  }
+}
+
+// add current item text to previous 3 (or whatever MAX_CONTEXT_ITEMS is) items' nextTexts
+function updateContextForQueueItems(newItem: QueueItem): void {
+  const queueLength = audioQueue.length;
+  const contextItemsCount = Math.min(MAX_CONTEXT_ITEMS, queueLength);
+
+  for (let i = 0; i < contextItemsCount; i++) {
+    const index = queueLength - 1 - i;
+    audioQueue[index].nextTexts.push(newItem.text);
   }
 }
 
@@ -47,10 +86,22 @@ async function fetchNextAudio() {
 
   isFetching = true;
   const item = pendingItems[0];
+
+  const shouldWait =
+    !isSentenceEnding(item.text) &&
+    item.nextTexts.length < MIN_NEXT_TEXTS &&
+    Date.now() - item.createdAt < MAX_WAIT_TIME &&
+    Date.now() - lastActivityTimestamp < INACTIVITY_THRESHOLD;
+
+  if (shouldWait) {
+    setTimeout(fetchNextAudio, 100); // Check again after a short delay
+    return;
+  }
+
   item.status = "fetching";
 
   try {
-    const audioBuffer = await streamTTS(item.text);
+    const audioBuffer = await streamTTS(item);
     item.audioBuffer = audioBuffer;
     item.status = "ready";
 
@@ -65,7 +116,7 @@ async function fetchNextAudio() {
   fetchNextAudio();
 }
 
-export async function streamTTS(text: string): Promise<AudioBuffer> {
+export async function streamTTS(item: QueueItem): Promise<AudioBuffer> {
   if (typeof window === "undefined") {
     throw new Error("streamTTS called in a non-browser environment");
   }
@@ -80,7 +131,11 @@ export async function streamTTS(text: string): Promise<AudioBuffer> {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({
+      text: item.text,
+      next_texts: item.nextTexts,
+      index: item.index,
+    }),
   });
 
   if (!response.ok) {
@@ -137,4 +192,5 @@ export function stopAudio() {
   }
   isPlaying = false;
   isFetching = false;
+  currentIndex = 0;
 }
