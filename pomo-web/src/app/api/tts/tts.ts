@@ -9,6 +9,7 @@ interface ResponseDictionary {
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY3;
 const VOICE_ID = "ODq5zmih8GrVes37Dizd"; // Patrick;
+const FIRST_INDEX_LATENCY = 1; // integer 0-4 (higher = faster but worse quality)
 
 if (!ELEVENLABS_API_KEY) {
   throw new Error("ELEVENLABS_API_KEY is not set in environment variables");
@@ -67,6 +68,7 @@ export const createAudioStreamFromText = async (
     previous_text: prev_texts.length == 0 ? undefined : prev_texts.join(" "),
     next_text: next_texts.length == 0 ? undefined : next_texts.join(" "),
     previous_request_ids: prev_ids.length == 0 ? undefined : prev_ids,
+    optimize_streaming_latency: index === 0 ? FIRST_INDEX_LATENCY : 0,
   };
 
   const response = await fetch(url, {

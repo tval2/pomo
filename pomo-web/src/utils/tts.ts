@@ -8,15 +8,29 @@ interface QueueItem {
   audioBuffer?: AudioBuffer;
   status: "pending" | "fetching" | "ready" | "playing";
   index: number;
+  createdAt: number;
 }
 
 let audioQueue: QueueItem[] = [];
 let isPlaying = false;
 let isFetching = false;
 let currentIndex = 0;
+let lastActivityTimestamp = Date.now();
 
 const MAX_CONCURRENT_FETCHES = 3;
 const MAX_CONTEXT_ITEMS = 3;
+const MIN_NEXT_TEXTS = 1;
+const MAX_WAIT_TIME = 3000;
+const INACTIVITY_THRESHOLD = 10000;
+
+function isSentenceEnding(text: string): boolean {
+  const trimmedText = text.trim();
+  return (
+    trimmedText.endsWith(".") ||
+    trimmedText.endsWith("?") ||
+    trimmedText.endsWith("!")
+  );
+}
 
 export async function queueAudioText(text: string) {
   const cleanedText = cleanTextPlayed(text);
@@ -26,10 +40,12 @@ export async function queueAudioText(text: string) {
       nextTexts: [],
       status: "pending",
       index: currentIndex++,
+      createdAt: Date.now(),
     };
 
     updateContextForQueueItems(newItem);
     audioQueue.push(newItem);
+    lastActivityTimestamp = Date.now();
   }
 
   if (!isPlaying) {
@@ -70,6 +86,18 @@ async function fetchNextAudio() {
 
   isFetching = true;
   const item = pendingItems[0];
+
+  const shouldWait =
+    !isSentenceEnding(item.text) &&
+    item.nextTexts.length < MIN_NEXT_TEXTS &&
+    Date.now() - item.createdAt < MAX_WAIT_TIME &&
+    Date.now() - lastActivityTimestamp < INACTIVITY_THRESHOLD;
+
+  if (shouldWait) {
+    setTimeout(fetchNextAudio, 100); // Check again after a short delay
+    return;
+  }
+
   item.status = "fetching";
 
   try {

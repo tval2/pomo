@@ -3,7 +3,7 @@ import { isEndOfSentence, processChunk } from "./helpers";
 
 type Response = { id: number; text: string };
 
-export type LLMData = { audio?: string; image?: string, text?: string };
+export type LLMData = { audio?: string; image?: string; text?: string };
 
 export async function callChat(
   data: LLMData,
