@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
+import { PvRecorder } from "@picovoice/pvrecorder-node";
 
 const SHOW_AUDIO = false;
 const CHUNK_INTERVAL = 100;
@@ -30,6 +31,10 @@ const getSupportedMimeType = () => {
   throw new Error("No supported MIME type found for MediaRecorder");
 };
 
+// TODO:
+// 1. use VAD (Picovoice Cobra or Google WebRTC VAD) to detect speech
+// 2. if voice is not detected, don't send anything
+// 3. if voice is detected, send the audio to the LLM until the person stops speaking
 export default function WebcamAudio(props: WebcamAudioProps) {
   const [audioStream, setAudioStream] = useState<MediaStream>();
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
