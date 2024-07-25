@@ -3,14 +3,14 @@ import { isEndOfSentence, processChunk } from "./helpers";
 
 type Response = { id: number; text: string };
 
-export type LLMData = { audio?: string; image?: string; text?: string };
+export type LLMData = { audio?: string; images?: string[]; text?: string };
 
 export async function callChat(
   data: LLMData,
   responseId: number,
   setResponses: (responses: (prevResponses: Response[]) => Response[]) => void
 ): Promise<number> {
-  if (!data || (!data.image && !data.audio && !data.text)) {
+  if (!data || (!data.images && !data.audio && !data.text)) {
     return responseId;
   }
 
@@ -83,7 +83,7 @@ export async function callLLM(
   responseId: number,
   setResponses: (responses: (prevResponses: Response[]) => Response[]) => void
 ): Promise<number> {
-  if (!data || (!data.image && !data.audio && !data.text)) {
+  if (!data || (!data.images && !data.audio && !data.text)) {
     console.error("No data to send to callLLM");
     return responseId;
   }

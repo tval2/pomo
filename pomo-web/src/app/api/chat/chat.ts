@@ -38,7 +38,7 @@ const safetySettings = [
   },
 ];
 
-function formatData(type: string, data: string) {
+function formatDataWithMime(type: string, data: string) {
   const mimeType64Match = type.match(/data:(.*?);base64/);
   const mimeTypeMatch = type.match(/data:(.*?)/);
   if (mimeType64Match || mimeTypeMatch) {
@@ -76,33 +76,56 @@ const chat = model.startChat({
   },
 });
 
+function processDataUri(str: string) {
+  const parts = str.split(",");
+  if (parts.length !== 2) {
+    throw new Error(`Invalid data URI format: ${str.substring(0, 20)}...`);
+  }
+  return formatDataWithMime(parts[0], parts[1]);
+}
+
+function configureLlmData(data: LLMData) {
+  let messageData: any[] = [];
+
+  for (const [key, value] of Object.entries(data)) {
+    if (!value) continue;
+
+    if (key === "images" && Array.isArray(value)) {
+      value.forEach((item) => {
+        if (typeof item === "string" && item.startsWith("data:")) {
+          messageData.push(processDataUri(item));
+        } else {
+          console.warn(
+            `Skipping invalid image data: ${item.substring(0, 20)}...`
+          );
+        }
+      });
+    } else if (
+      key === "audio" &&
+      typeof value === "string" &&
+      value.startsWith("data:")
+    ) {
+      messageData.push(processDataUri(value));
+    } else if (typeof value === "string") {
+      messageData.push({ text: value });
+    } else {
+      console.warn(`Skipping invalid data for key: ${key}`);
+    }
+  }
+
+  if (messageData.length === 0) {
+    throw new Error("All props are empty in gatherData");
+  }
+
+  return messageData;
+}
+
 export async function sendMessage2LLM(data: LLMData) {
   if (!data) {
     throw new Error("No data provided in sendMessage2LLM");
   }
 
-  let messageData = [];
-  for (let propData of Object.values(data)) {
-    if (!propData) {
-      continue;
-    }
-
-    if (propData.startsWith("data")) {
-      const parts = propData.split(",");
-      if (parts.length !== 2) {
-        throw new Error("Invalid data format");
-      }
-
-      const dataPart = formatData(parts[0], parts[1]);
-      messageData.push(dataPart);
-    } else {
-      messageData.push(propData);
-    }
-  }
-
-  if (messageData.length === 0) {
-    throw new Error("All props are empty in sendMessage2LLM");
-  }
+  const messageData = configureLlmData(data);
 
   try {
     const result = await chat.sendMessageStream(messageData);

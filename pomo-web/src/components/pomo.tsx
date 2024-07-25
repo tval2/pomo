@@ -1,24 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useState, useRef } from "react";
 import { LLMData, callChat, callLLM, stopLLMAudio } from "../utils/llm";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
-
-enum DataType {
-  IMAGE = 0,
-  AUDIO,
-}
 
 interface Response {
   id: number;
   text: string;
 }
 
+const MAX_RECENT_IMAGES = 5;
+
 export default function Pomo() {
-  const [imageQueue, setImageQueue] = useState<string[]>([]);
-  const [audioQueue, setAudioQueue] = useState<string[]>([]);
+  const [recentImages, setRecentImages] = useState<string[]>([]);
   const [responses, setResponses] = useState<Response[]>([]);
   const [clickResponses, setClickResponses] = useState<Response[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -26,53 +22,60 @@ export default function Pomo() {
   const [playAudio, setPlayAudio] = useState(false);
   const [sendPhotos, setSendPhotos] = useState(false);
   const [sendAudio, setSendAudio] = useState(false);
-  const [latestAudioData, setLatestAudioData] = useState<string | null>(null);
   const responseId = useRef(0);
   const clickResponseId = useRef(0);
 
-  const addToQueue = (data: string, dataType: DataType) => {
-    switch (dataType) {
-      case DataType.IMAGE:
-        setImageQueue((prevQueue) => [...prevQueue, data]);
-        break;
-      case DataType.AUDIO:
-        setLatestAudioData(data);
-        setAudioQueue((prevQueue) => [...prevQueue, data]);
-        break;
-    }
-  };
+  const processAudioWithImages = useCallback(
+    async (audioData: string) => {
+      if (isProcessing) return;
 
-  const processQueue = useCallback(async () => {
-    if (imageQueue.length === 0 || audioQueue.length === 0 || isProcessing)
-      return;
+      setIsProcessing(true);
+      let data: LLMData = {};
 
-    setIsProcessing(true);
-    let data: LLMData = {};
-    if (sendPhotos && imageQueue[0].startsWith("data:image")) {
-      data.image = imageQueue[0];
-    }
-    if (sendAudio && audioQueue[0].startsWith("data:audio")) {
-      data.audio = audioQueue[0];
-    }
+      if (sendAudio) {
+        data.audio = audioData;
+      }
 
-    try {
-      responseId.current = await callChat(
-        data,
-        responseId.current,
-        setResponses
-      );
-      setImageQueue((prevQueue) => prevQueue.slice(1));
-      setAudioQueue((prevQueue) => prevQueue.slice(1));
-    } catch (error) {
-      console.error("Error processing queue item:", error);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [imageQueue, audioQueue, isProcessing, responseId]);
+      if (sendPhotos && recentImages.length > 0) {
+        data.images = recentImages;
+      }
+
+      try {
+        responseId.current = await callChat(
+          data,
+          responseId.current,
+          setResponses
+        );
+
+        if (sendPhotos && recentImages.length > 0) {
+          setRecentImages([]);
+        }
+      } catch (error) {
+        console.error("Error processing audio with images:", error);
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [isProcessing, sendAudio, sendPhotos, recentImages]
+  );
+
+  const handleNewImage = useCallback((imageData: string) => {
+    setRecentImages((prevImages) => [
+      imageData,
+      ...prevImages.slice(0, MAX_RECENT_IMAGES - 1),
+    ]);
+  }, []);
+
+  const handleNewAudio = useCallback(
+    (audioData: string) => {
+      processAudioWithImages(audioData);
+    },
+    [processAudioWithImages]
+  );
 
   const processClick = useCallback(
     async (image: string, coords: string) => {
-      let data: LLMData = { image: image, text: coords };
+      let data: LLMData = { images: [image], text: coords };
 
       setIsClickProcessing(true);
       try {
@@ -89,10 +92,6 @@ export default function Pomo() {
     },
     [isClickProcessing, clickResponseId]
   );
-
-  useEffect(() => {
-    processQueue();
-  }, [imageQueue, audioQueue, processQueue]);
 
   const toggleAudio = () => {
     if (playAudio) {
@@ -112,18 +111,12 @@ export default function Pomo() {
   return (
     <div className="w-full h-full relative p-4">
       <WebcamVideo
-        onNewData={(data: string) => {
-          addToQueue(data, DataType.IMAGE);
-        }}
+        onNewData={handleNewImage}
         onClick={(data: string, x: number, y: number) => {
           processClick(data, JSON.stringify({ x: x, y: y }));
         }}
       />
-      <WebcamAudio
-        onNewData={(data: string) => {
-          addToQueue(data, DataType.AUDIO);
-        }}
-      />
+      <WebcamAudio onNewData={handleNewAudio} />
       <div>
         <button
           className={`px-4 py-2 rounded ${

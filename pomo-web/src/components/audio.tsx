@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { WebVoiceProcessor } from "@picovoice/web-voice-processor";
 
 const VAD_THRESHOLD = 0.5;
+const DELAY_AFTER_VOICE_MS = 1000;
+const ROLLING_BUFFER_SIZE = 15;
 
 interface WebcamAudioProps {
   onNewData: (data: string) => void;
@@ -9,45 +11,64 @@ interface WebcamAudioProps {
 
 export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
   const [isRecording, setIsRecording] = useState(false);
-  const [audioChunks, setAudioChunks] = useState<Int16Array[]>([]);
   const [voiceProbability, setVoiceProbability] = useState(0);
   const engineRef = useRef<any>(null);
+  const audioChunksRef = useRef<Int16Array[]>([]);
+  const rollingBufferRef = useRef<Int16Array[]>([]);
+  const lastVoiceDetectionRef = useRef<number | null>(null);
+  const sendAudioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const processAudioFrame = useCallback(
-    async (inputFrame: Int16Array) => {
-      try {
-        const response = await fetch("/api/vad", {
-          method: "POST",
-          body: inputFrame.buffer,
-          headers: {
-            "Content-Type": "application/octet-stream",
-          },
-        });
-        const { voiceProbability } = await response.json();
+  const processAudioFrame = useCallback(async (inputFrame: Int16Array) => {
+    try {
+      const response = await fetch("/api/vad", {
+        method: "POST",
+        body: inputFrame.buffer,
+        headers: {
+          "Content-Type": "application/octet-stream",
+        },
+      });
+      const { voiceProbability } = await response.json();
+      setVoiceProbability(voiceProbability);
 
-        setVoiceProbability(voiceProbability);
-
-        if (voiceProbability > VAD_THRESHOLD) {
-          setAudioChunks((chunks) => [...chunks, inputFrame]);
-        } else if (audioChunks.length > 0) {
-          sendAudioToLLM();
-        }
-      } catch (error) {
-        console.error("Error processing audio frame:", error);
+      rollingBufferRef.current.push(inputFrame);
+      if (rollingBufferRef.current.length > ROLLING_BUFFER_SIZE) {
+        rollingBufferRef.current.shift();
       }
-    },
-    [audioChunks]
-  );
+
+      if (voiceProbability > VAD_THRESHOLD) {
+        if (audioChunksRef.current.length === 0) {
+          audioChunksRef.current = [...rollingBufferRef.current];
+        } else {
+          audioChunksRef.current.push(inputFrame);
+        }
+        lastVoiceDetectionRef.current = Date.now();
+
+        if (sendAudioTimeoutRef.current) {
+          clearTimeout(sendAudioTimeoutRef.current);
+          sendAudioTimeoutRef.current = null;
+        }
+      } else if (audioChunksRef.current.length > 0) {
+        if (sendAudioTimeoutRef.current === null) {
+          sendAudioTimeoutRef.current = setTimeout(() => {
+            sendAudioToLLM();
+            sendAudioTimeoutRef.current = null;
+          }, DELAY_AFTER_VOICE_MS);
+        }
+      }
+    } catch (error) {
+      console.error("Error processing audio frame:", error);
+    }
+  }, []);
 
   const sendAudioToLLM = useCallback(() => {
-    if (audioChunks.length > 0) {
-      const totalLength = audioChunks.reduce(
+    if (audioChunksRef.current.length > 0) {
+      const totalLength = audioChunksRef.current.reduce(
         (acc, chunk) => acc + chunk.length,
         0
       );
       const combinedChunks = new Int16Array(totalLength);
       let offset = 0;
-      for (const chunk of audioChunks) {
+      for (const chunk of audioChunksRef.current) {
         combinedChunks.set(chunk, offset);
         offset += chunk.length;
       }
@@ -61,9 +82,9 @@ export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
         onNewData(audioURL);
       };
       reader.readAsDataURL(audioBlob);
-      setAudioChunks([]);
+      audioChunksRef.current = [];
     }
-  }, [audioChunks, onNewData]);
+  }, [onNewData]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -106,6 +127,9 @@ export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
     return () => {
       if (engineRef.current) {
         WebVoiceProcessor.unsubscribe(engineRef.current);
+      }
+      if (sendAudioTimeoutRef.current) {
+        clearTimeout(sendAudioTimeoutRef.current);
       }
     };
   }, []);
