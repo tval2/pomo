@@ -1,131 +1,145 @@
-"use client";
+import React, { useEffect, useState, useCallback, useRef } from "react";
+import { WebVoiceProcessor } from "@picovoice/web-voice-processor";
 
-import { useRef, useState, useEffect, useCallback } from "react";
-import { PvRecorder } from "@picovoice/pvrecorder-node";
-
-const SHOW_AUDIO = false;
-const CHUNK_INTERVAL = 100;
-const AUDIO_INTERVAL = 4500;
-
-function usePrevious(value: any): any {
-  const ref = useRef();
-  useEffect(() => {
-    ref.current = value;
-  }, [value]);
-  return ref.current;
-}
+const VAD_THRESHOLD = 0.5;
 
 interface WebcamAudioProps {
   onNewData: (data: string) => void;
 }
 
-const getSupportedMimeType = () => {
-  const possibleTypes = ["audio/webm", "audio/ogg", "audio/mp3", "audio/wav"];
+export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioChunks, setAudioChunks] = useState<Int16Array[]>([]);
+  const [voiceProbability, setVoiceProbability] = useState(0);
+  const engineRef = useRef<any>(null);
 
-  for (const type of possibleTypes) {
-    if (MediaRecorder.isTypeSupported(type)) {
-      return type;
-    }
-  }
+  const processAudioFrame = useCallback(
+    async (inputFrame: Int16Array) => {
+      try {
+        const response = await fetch("/api/vad", {
+          method: "POST",
+          body: inputFrame.buffer,
+          headers: {
+            "Content-Type": "application/octet-stream",
+          },
+        });
+        const { voiceProbability } = await response.json();
 
-  throw new Error("No supported MIME type found for MediaRecorder");
-};
+        setVoiceProbability(voiceProbability);
 
-// TODO:
-// 1. use VAD (Picovoice Cobra or Google WebRTC VAD) to detect speech
-// 2. if voice is not detected, don't send anything
-// 3. if voice is detected, send the audio to the LLM until the person stops speaking
-export default function WebcamAudio(props: WebcamAudioProps) {
-  const [audioStream, setAudioStream] = useState<MediaStream>();
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
-  const [audioIndex, setAudioIndex] = useState<number>(0);
-  const prevChunks = usePrevious(audioChunks);
-  const audioContainerRef = useRef<HTMLDivElement>(null);
+        if (voiceProbability > VAD_THRESHOLD) {
+          setAudioChunks((chunks) => [...chunks, inputFrame]);
+        } else if (audioChunks.length > 0) {
+          sendAudioToLLM();
+        }
+      } catch (error) {
+        console.error("Error processing audio frame:", error);
+      }
+    },
+    [audioChunks]
+  );
 
-  const setupMediaStream = useCallback(async () => {
-    try {
-      const as = await navigator.mediaDevices.getUserMedia({
-        video: false,
-        audio: true,
+  const sendAudioToLLM = useCallback(() => {
+    if (audioChunks.length > 0) {
+      const totalLength = audioChunks.reduce(
+        (acc, chunk) => acc + chunk.length,
+        0
+      );
+      const combinedChunks = new Int16Array(totalLength);
+      let offset = 0;
+      for (const chunk of audioChunks) {
+        combinedChunks.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      const audioBlob = new Blob([combinedChunks.buffer], {
+        type: "audio/raw",
       });
-      setAudioStream(as);
-    } catch (e) {
-      alert("Audio is disabled");
-      throw e;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (audioChunks.length === 0 && prevChunks?.length > 0) {
       const reader = new FileReader();
       reader.onload = (e) => {
         const audioURL = e.target?.result as string;
-        const container = audioContainerRef.current;
-
-        if (!container || !audioURL) {
-          return;
-        }
-
-        const MAX_AUDIO_ELEMENTS = 10;
-
-        if (container.children.length < MAX_AUDIO_ELEMENTS) {
-          const audio = document.createElement("audio");
-          audio.controls = true;
-          audio.src = audioURL;
-          container.appendChild(audio);
-        } else {
-          const audio = container.children[audioIndex] as HTMLAudioElement;
-          audio.src = audioURL;
-          setAudioIndex((audioIndex) => (audioIndex + 1) % MAX_AUDIO_ELEMENTS);
-        }
-        props.onNewData(audioURL);
+        onNewData(audioURL);
       };
-      reader.readAsDataURL(
-        new Blob(prevChunks, { type: getSupportedMimeType() })
+      reader.readAsDataURL(audioBlob);
+      setAudioChunks([]);
+    }
+  }, [audioChunks, onNewData]);
+
+  const startRecording = useCallback(async () => {
+    try {
+      const engine = {
+        onmessage: function (e: MessageEvent) {
+          if (e.data.command === "process") {
+            processAudioFrame(e.data.inputFrame);
+          }
+        },
+      };
+      engineRef.current = engine;
+      await WebVoiceProcessor.subscribe(engine);
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Failed to start recording:", error);
+      alert(
+        "Failed to start recording. Please check your microphone permissions."
       );
     }
-  }, [audioChunks, prevChunks]);
+  }, [processAudioFrame]);
+
+  const stopRecording = useCallback(async () => {
+    if (engineRef.current) {
+      await WebVoiceProcessor.unsubscribe(engineRef.current);
+      engineRef.current = null;
+    }
+    setIsRecording(false);
+    sendAudioToLLM();
+  }, [sendAudioToLLM]);
+
+  const toggleRecording = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  }, [isRecording, startRecording, stopRecording]);
 
   useEffect(() => {
-    const setupWebcamAudio = async () => {
-      if (!audioStream) {
-        await setupMediaStream();
-      }
-    };
-    setupWebcamAudio();
-
-    let interval = setInterval(() => {
-      if (!audioStream) {
-        return;
-      }
-
-      const mimeType = getSupportedMimeType();
-      const recorder = new MediaRecorder(audioStream, { mimeType });
-
-      recorder.ondataavailable = (e) => {
-        setAudioChunks((audioChunks) => [...audioChunks, e.data]);
-      };
-
-      recorder.onstop = () => {
-        setAudioChunks([]);
-      };
-
-      recorder.start(CHUNK_INTERVAL);
-
-      setTimeout(() => {
-        recorder.stop();
-      }, AUDIO_INTERVAL);
-    }, AUDIO_INTERVAL);
-
     return () => {
-      clearInterval(interval);
+      if (engineRef.current) {
+        WebVoiceProcessor.unsubscribe(engineRef.current);
+      }
     };
-  }, [audioStream]);
+  }, []);
+
+  const percentage = voiceProbability * 100;
+  const barLength = Math.floor((percentage / 10) * 3);
+  const emptyLength = 30 - barLength;
+  const spacer = ` `.repeat(3 - percentage.toFixed(0).length);
+  const buttonClasses = `py-2 px-4 text-lg font-bold rounded cursor-pointer transition-colors duration-300 ${
+    isRecording ? "bg-green-500" : "bg-red-500"
+  } text-white`;
 
   return (
-    <div
-      className={"w-fit h-full mx-auto " + (SHOW_AUDIO ? "block" : "hidden")}
-      ref={audioContainerRef}
-    />
+    <div>
+      <div className="flex items-center space-x-4">
+        <button onClick={toggleRecording} className={buttonClasses}>
+          {isRecording ? "Stop Recording" : "Start Recording"}
+        </button>
+        <div
+          style={{
+            marginTop: "20px",
+            fontFamily: "monospace",
+            whiteSpace: "pre",
+          }}
+        >
+          Voice Probability:
+          <div style={{ marginTop: "5px" }}>
+            [{spacer}
+            {percentage.toFixed(0)}]|
+            {"█".repeat(barLength)}
+            {" ".repeat(emptyLength)}|
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

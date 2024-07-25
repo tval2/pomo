@@ -5,7 +5,6 @@ import { LLMData, callChat, callLLM, stopLLMAudio } from "../utils/llm";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
-import VAD from "./vad";
 
 enum DataType {
   IMAGE = 0,
@@ -125,7 +124,6 @@ export default function Pomo() {
           addToQueue(data, DataType.AUDIO);
         }}
       />
-      <VAD audioData={latestAudioData} />
       <div>
         <button
           className={`px-4 py-2 rounded ${

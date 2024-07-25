@@ -4,10 +4,7 @@ import { detectVoice } from "./vad";
 export async function POST(req: NextRequest) {
   try {
     const audioData = await req.arrayBuffer();
-
-    // Ensure the audio data length is even
-    const adjustedLength = audioData.byteLength - (audioData.byteLength % 2);
-    const int16Array = new Int16Array(audioData.slice(0, adjustedLength));
+    const int16Array = new Int16Array(audioData);
 
     if (int16Array.length === 0) {
       throw new Error("No valid audio data received");

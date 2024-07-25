@@ -13,6 +13,7 @@ const nextConfig = {
 
     return config;
   },
+  transpilePackages: ["@picovoice/web-voice-processor"],
 };
 
 module.exports = nextConfig;

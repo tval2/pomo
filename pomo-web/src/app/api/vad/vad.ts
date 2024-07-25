@@ -1,7 +1,5 @@
 import path from "path";
 import os from "os";
-import fs from "fs";
-console.log("Node.js ABI version:", process.versions.modules);
 
 const PICOVOICE_API_KEY = process.env.PICOVOICE_API_KEY!;
 
@@ -32,24 +30,7 @@ async function initializeCobra() {
     throw new Error(`Unsupported platform: ${platform}`);
   }
 
-  console.log("Attempting to load library from:", libraryPath);
-
-  if (fs.existsSync(libraryPath)) {
-    console.log("Library file exists");
-  } else {
-    console.log("Library file does not exist");
-    // List the contents of the parent directory
-    const parentDir = path.dirname(libraryPath);
-    console.log("Contents of", parentDir, ":");
-    fs.readdirSync(parentDir).forEach((file) => {
-      console.log("- " + file);
-    });
-  }
-
-  console.log("About to dynamically import Cobra");
   const { Cobra } = await import("@picovoice/cobra-node");
-  console.log("Cobra imported successfully");
-
   cobra = new Cobra(PICOVOICE_API_KEY, { libraryPath });
 }
 
