@@ -1,7 +1,13 @@
 "use client";
 
-import { useCallback, useState, useRef } from "react";
-import { LLMData, callChat, callLLM, stopLLMAudio } from "../utils/llm";
+import { useCallback, useState, useRef, useEffect } from "react";
+import {
+  LLMData,
+  callChat,
+  callLLM,
+  stopLLMAudio,
+  setAudioEnabled,
+} from "../utils/llm";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
@@ -11,10 +17,9 @@ interface Response {
   text: string;
 }
 
-const MAX_RECENT_IMAGES = 5;
+const MAX_RECENT_IMAGES = 3;
 
 export default function Pomo() {
-  const [recentImages, setRecentImages] = useState<string[]>([]);
   const [responses, setResponses] = useState<Response[]>([]);
   const [clickResponses, setClickResponses] = useState<Response[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -22,48 +27,67 @@ export default function Pomo() {
   const [playAudio, setPlayAudio] = useState(false);
   const [sendPhotos, setSendPhotos] = useState(false);
   const [sendAudio, setSendAudio] = useState(false);
+
   const responseId = useRef(0);
   const clickResponseId = useRef(0);
+  const sendPhotosRef = useRef(false);
+  const sendAudioRef = useRef(false);
+  const recentImagesRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    sendPhotosRef.current = sendPhotos;
+  }, [sendPhotos]);
+
+  useEffect(() => {
+    sendAudioRef.current = sendAudio;
+  }, [sendAudio]);
 
   const processAudioWithImages = useCallback(
     async (audioData: string) => {
-      if (isProcessing) return;
+      setIsProcessing((isProcessing) => {
+        if (isProcessing) return true;
 
-      setIsProcessing(true);
-      let data: LLMData = {};
+        const processData = async () => {
+          const data: LLMData = {};
 
-      if (sendAudio) {
-        data.audio = audioData;
-      }
+          if (sendAudioRef.current) {
+            data.audio = audioData;
+          }
 
-      if (sendPhotos && recentImages.length > 0) {
-        data.images = recentImages;
-      }
+          if (sendPhotosRef.current && recentImagesRef.current.length > 0) {
+            data.images = recentImagesRef.current;
+          }
 
-      try {
-        responseId.current = await callChat(
-          data,
-          responseId.current,
-          setResponses
-        );
+          try {
+            responseId.current = await callChat(
+              data,
+              responseId.current,
+              setResponses,
+              playAudio
+            );
 
-        if (sendPhotos && recentImages.length > 0) {
-          setRecentImages([]);
-        }
-      } catch (error) {
-        console.error("Error processing audio with images:", error);
-      } finally {
-        setIsProcessing(false);
-      }
+            if (sendPhotosRef.current && recentImagesRef.current.length > 0) {
+              recentImagesRef.current = [];
+            }
+          } catch (error) {
+            console.error("Error processing audio with images:", error);
+          } finally {
+            setIsProcessing(false);
+          }
+        };
+
+        processData();
+        return true;
+      });
     },
-    [isProcessing, sendAudio, sendPhotos, recentImages]
+    [playAudio]
   );
 
   const handleNewImage = useCallback((imageData: string) => {
-    setRecentImages((prevImages) => [
+    recentImagesRef.current = [
       imageData,
-      ...prevImages.slice(0, MAX_RECENT_IMAGES - 1),
-    ]);
+      ...recentImagesRef.current.slice(0, MAX_RECENT_IMAGES - 1),
+    ];
   }, []);
 
   const handleNewAudio = useCallback(
@@ -73,40 +97,37 @@ export default function Pomo() {
     [processAudioWithImages]
   );
 
-  const processClick = useCallback(
-    async (image: string, coords: string) => {
-      let data: LLMData = { images: [image], text: coords };
+  const processClick = useCallback(async (image: string, coords: string) => {
+    let data: LLMData = { images: [image], text: coords };
 
-      setIsClickProcessing(true);
-      try {
-        clickResponseId.current = await callLLM(
-          data,
-          clickResponseId.current,
-          setClickResponses
-        );
-      } catch (error) {
-        console.error("Error processing click:", error);
-      } finally {
-        setIsClickProcessing(false);
-      }
-    },
-    [isClickProcessing, clickResponseId]
-  );
-
-  const toggleAudio = () => {
-    if (playAudio) {
-      stopLLMAudio();
+    setIsClickProcessing(true);
+    try {
+      clickResponseId.current = await callLLM(
+        data,
+        clickResponseId.current,
+        setClickResponses
+      );
+    } catch (error) {
+      console.error("Error processing click:", error);
+    } finally {
+      setIsClickProcessing(false);
     }
-    setPlayAudio(!playAudio);
-  };
+  }, []);
 
-  const toggleSendPhotos = () => {
-    setSendPhotos(!sendPhotos);
-  };
+  const toggleAudioOutput = useCallback(() => {
+    setPlayAudio((prev) => {
+      setAudioEnabled(!prev);
+      return !prev;
+    });
+  }, []);
 
-  const toggleSendAudio = () => {
-    setSendAudio(!sendAudio);
-  };
+  const toggleSendPhotos = useCallback(() => {
+    setSendPhotos((prev) => !prev);
+  }, []);
+
+  const toggleSendAudio = useCallback(() => {
+    setSendAudio((prev) => !prev);
+  }, []);
 
   return (
     <div className="w-full h-full relative p-4">
@@ -122,7 +143,7 @@ export default function Pomo() {
           className={`px-4 py-2 rounded ${
             playAudio ? "bg-green-500" : "bg-red-500"
           } text-white`}
-          onClick={toggleAudio}
+          onClick={toggleAudioOutput}
         >
           {playAudio ? "TTS On" : "TTS Off"}
         </button>
@@ -143,11 +164,11 @@ export default function Pomo() {
           {sendAudio ? "Sending audio" : "Not sending audio"}
         </button>
       </div>
-      {clickResponses.length > 0 ? (
+      {clickResponses.length > 0 && (
         <p className="message mb-2 p-2">
           {"Responding as: " + clickResponses[clickResponses.length - 1].text}
         </p>
-      ) : null}
+      )}
       <TextFeed responses={responses} />
     </div>
   );

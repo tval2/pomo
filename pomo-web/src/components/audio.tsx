@@ -1,9 +1,12 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { WebVoiceProcessor } from "@picovoice/web-voice-processor";
+import { WaveFile } from "wavefile";
 
-const VAD_THRESHOLD = 0.5;
-const DELAY_AFTER_VOICE_MS = 1000;
-const ROLLING_BUFFER_SIZE = 15;
+// currently sampling at 16kHz (16,000 samples per second) @ frame rate of
+//  512 samples per frame, which is 31.25 frames per second (or 0.032 seconds per frame).
+const VAD_THRESHOLD = 0.7; // require a probability of at least 70% to track voice
+const DELAY_AFTER_VOICE_MS = 1700; // wait 1.7 seconds after voice stops before sending audio
+const ROLLING_BUFFER_SIZE = 32; // grab the previous 15 frames (or the previous 1 second)
 
 interface WebcamAudioProps {
   onNewData: (data: string) => void;
@@ -18,47 +21,11 @@ export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
   const lastVoiceDetectionRef = useRef<number | null>(null);
   const sendAudioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const processAudioFrame = useCallback(async (inputFrame: Int16Array) => {
-    try {
-      const response = await fetch("/api/vad", {
-        method: "POST",
-        body: inputFrame.buffer,
-        headers: {
-          "Content-Type": "application/octet-stream",
-        },
-      });
-      const { voiceProbability } = await response.json();
-      setVoiceProbability(voiceProbability);
-
-      rollingBufferRef.current.push(inputFrame);
-      if (rollingBufferRef.current.length > ROLLING_BUFFER_SIZE) {
-        rollingBufferRef.current.shift();
-      }
-
-      if (voiceProbability > VAD_THRESHOLD) {
-        if (audioChunksRef.current.length === 0) {
-          audioChunksRef.current = [...rollingBufferRef.current];
-        } else {
-          audioChunksRef.current.push(inputFrame);
-        }
-        lastVoiceDetectionRef.current = Date.now();
-
-        if (sendAudioTimeoutRef.current) {
-          clearTimeout(sendAudioTimeoutRef.current);
-          sendAudioTimeoutRef.current = null;
-        }
-      } else if (audioChunksRef.current.length > 0) {
-        if (sendAudioTimeoutRef.current === null) {
-          sendAudioTimeoutRef.current = setTimeout(() => {
-            sendAudioToLLM();
-            sendAudioTimeoutRef.current = null;
-          }, DELAY_AFTER_VOICE_MS);
-        }
-      }
-    } catch (error) {
-      console.error("Error processing audio frame:", error);
-    }
-  }, []);
+  function convertPCMToWav(pcmData: Int16Array, sampleRate = 16000) {
+    const wav = new WaveFile();
+    wav.fromScratch(1, sampleRate, "16", pcmData);
+    return wav.toBuffer();
+  }
 
   const sendAudioToLLM = useCallback(() => {
     if (audioChunksRef.current.length > 0) {
@@ -73,8 +40,9 @@ export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
         offset += chunk.length;
       }
 
-      const audioBlob = new Blob([combinedChunks.buffer], {
-        type: "audio/raw",
+      const wavBuffer = convertPCMToWav(combinedChunks);
+      const audioBlob = new Blob([wavBuffer], {
+        type: "audio/wav",
       });
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -85,6 +53,51 @@ export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
       audioChunksRef.current = [];
     }
   }, [onNewData]);
+
+  const processAudioFrame = useCallback(
+    async (inputFrame: Int16Array) => {
+      try {
+        const response = await fetch("/api/vad", {
+          method: "POST",
+          body: inputFrame.buffer,
+          headers: {
+            "Content-Type": "application/octet-stream",
+          },
+        });
+        const { voiceProbability } = await response.json();
+        setVoiceProbability(voiceProbability);
+
+        rollingBufferRef.current.push(inputFrame);
+        if (rollingBufferRef.current.length > ROLLING_BUFFER_SIZE) {
+          rollingBufferRef.current.shift();
+        }
+
+        if (voiceProbability > VAD_THRESHOLD) {
+          if (audioChunksRef.current.length === 0) {
+            audioChunksRef.current = [...rollingBufferRef.current];
+          } else {
+            audioChunksRef.current.push(inputFrame);
+          }
+          lastVoiceDetectionRef.current = Date.now();
+
+          if (sendAudioTimeoutRef.current) {
+            clearTimeout(sendAudioTimeoutRef.current);
+            sendAudioTimeoutRef.current = null;
+          }
+        } else if (audioChunksRef.current.length > 0) {
+          if (sendAudioTimeoutRef.current === null) {
+            sendAudioTimeoutRef.current = setTimeout(() => {
+              sendAudioToLLM();
+              sendAudioTimeoutRef.current = null;
+            }, DELAY_AFTER_VOICE_MS);
+          }
+        }
+      } catch (error) {
+        console.error("Error processing audio frame:", error);
+      }
+    },
+    [sendAudioToLLM]
+  );
 
   const startRecording = useCallback(async () => {
     try {
