@@ -1,13 +1,7 @@
 "use client";
 
 import { useCallback, useState, useRef, useEffect } from "react";
-import {
-  LLMData,
-  callChat,
-  callLLM,
-  stopLLMAudio,
-  setAudioEnabled,
-} from "../utils/llm";
+import { LLMData, callChat, callLLM, setAudioEnabled } from "../utils/llm";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
@@ -17,12 +11,11 @@ interface Response {
   text: string;
 }
 
-const MAX_RECENT_IMAGES = 3;
+const MAX_RECENT_IMAGES = 1;
 
 export default function Pomo() {
   const [responses, setResponses] = useState<Response[]>([]);
   const [clickResponses, setClickResponses] = useState<Response[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [isClickProcessing, setIsClickProcessing] = useState(false);
   const [playAudio, setPlayAudio] = useState(false);
   const [sendPhotos, setSendPhotos] = useState(false);
@@ -30,6 +23,7 @@ export default function Pomo() {
 
   const responseId = useRef(0);
   const clickResponseId = useRef(0);
+  const isProcessingRef = useRef(false);
   const sendPhotosRef = useRef(false);
   const sendAudioRef = useRef(false);
   const recentImagesRef = useRef<string[]>([]);
@@ -44,41 +38,38 @@ export default function Pomo() {
 
   const processAudioWithImages = useCallback(
     async (audioData: string) => {
-      setIsProcessing((isProcessing) => {
-        if (isProcessing) return true;
+      if (isProcessingRef.current) {
+        return;
+      }
 
-        const processData = async () => {
-          const data: LLMData = {};
+      isProcessingRef.current = true;
 
-          if (sendAudioRef.current) {
-            data.audio = audioData;
-          }
+      const data: LLMData = {};
 
-          if (sendPhotosRef.current && recentImagesRef.current.length > 0) {
-            data.images = recentImagesRef.current;
-          }
+      if (sendAudioRef.current) {
+        data.audio = audioData;
+      }
 
-          try {
-            responseId.current = await callChat(
-              data,
-              responseId.current,
-              setResponses,
-              playAudio
-            );
+      if (sendPhotosRef.current && recentImagesRef.current.length > 0) {
+        data.images = recentImagesRef.current;
+      }
 
-            if (sendPhotosRef.current && recentImagesRef.current.length > 0) {
-              recentImagesRef.current = [];
-            }
-          } catch (error) {
-            console.error("Error processing audio with images:", error);
-          } finally {
-            setIsProcessing(false);
-          }
-        };
+      try {
+        responseId.current = await callChat(
+          data,
+          responseId.current,
+          setResponses,
+          playAudio
+        );
 
-        processData();
-        return true;
-      });
+        if (sendPhotosRef.current && recentImagesRef.current.length > 0) {
+          recentImagesRef.current = [];
+        }
+      } catch (error) {
+        console.error("Error processing audio with images:", error);
+      } finally {
+        isProcessingRef.current = false;
+      }
     },
     [playAudio]
   );
