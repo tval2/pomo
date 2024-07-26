@@ -1,6 +1,7 @@
 import { cleanTextPlayed } from "./helpers";
 
 let audioContext: AudioContext | null = null;
+let audioEnabled = true;
 
 interface QueueItem {
   text: string;
@@ -32,7 +33,9 @@ function isSentenceEnding(text: string): boolean {
   );
 }
 
-export async function queueAudioText(text: string) {
+export async function queueAudioText(text: string, enabled: boolean) {
+  audioEnabled = enabled;
+
   const cleanedText = cleanTextPlayed(text);
   if (cleanedText) {
     const newItem: QueueItem = {
@@ -48,10 +51,10 @@ export async function queueAudioText(text: string) {
     lastActivityTimestamp = Date.now();
   }
 
-  if (!isPlaying) {
+  if (!isPlaying && audioEnabled) {
     playNextInQueue();
   }
-  if (!isFetching) {
+  if (!isFetching && audioEnabled) {
     fetchNextAudio();
   }
 }
@@ -148,7 +151,7 @@ export async function streamTTS(item: QueueItem): Promise<AudioBuffer> {
 }
 
 async function playNextInQueue() {
-  if (audioQueue.length === 0) {
+  if (audioQueue.length === 0 || !audioEnabled) {
     isPlaying = false;
     return;
   }
@@ -193,4 +196,13 @@ export function stopAudio() {
   isPlaying = false;
   isFetching = false;
   currentIndex = 0;
+}
+
+export function setAudioEnabled(enabled: boolean) {
+  audioEnabled = enabled;
+  if (!enabled) {
+    stopAudio();
+  } else if (audioQueue.length > 0 && !isPlaying) {
+    playNextInQueue();
+  }
 }

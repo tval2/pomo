@@ -1,16 +1,21 @@
-import { queueAudioText, stopAudio } from "./tts";
+import {
+  queueAudioText,
+  stopAudio,
+  setAudioEnabled as setTTSAudioEnabled,
+} from "./tts";
 import { isEndOfSentence, processChunk } from "./helpers";
 
 type Response = { id: number; text: string };
 
-export type LLMData = { audio?: string; image?: string; text?: string };
+export type LLMData = { audio?: string; images?: string[]; text?: string };
 
 export async function callChat(
   data: LLMData,
   responseId: number,
-  setResponses: (responses: (prevResponses: Response[]) => Response[]) => void
+  setResponses: (responses: (prevResponses: Response[]) => Response[]) => void,
+  playAudio: boolean // Whether to play the audio out loud
 ): Promise<number> {
-  if (!data || (!data.image && !data.audio && !data.text)) {
+  if (!data || (!data.images && !data.audio && !data.text)) {
     return responseId;
   }
 
@@ -49,7 +54,7 @@ export async function callChat(
         buffer += processedChunk;
 
         if (isEndOfSentence(buffer) && buffer) {
-          queueAudioText(buffer);
+          queueAudioText(buffer, playAudio);
           buffer = "";
         }
 
@@ -68,7 +73,7 @@ export async function callChat(
     }
 
     if (buffer) {
-      queueAudioText(buffer);
+      queueAudioText(buffer, playAudio);
     }
 
     return responseId + 1;
@@ -83,7 +88,7 @@ export async function callLLM(
   responseId: number,
   setResponses: (responses: (prevResponses: Response[]) => Response[]) => void
 ): Promise<number> {
-  if (!data || (!data.image && !data.audio && !data.text)) {
+  if (!data || (!data.images && !data.audio && !data.text)) {
     console.error("No data to send to callLLM");
     return responseId;
   }
@@ -130,6 +135,10 @@ export async function callLLM(
     console.error("Error calling llm API:", error);
     return responseId;
   }
+}
+
+export function setAudioEnabled(enabled: boolean) {
+  setTTSAudioEnabled(enabled);
 }
 
 export function stopLLMAudio() {

@@ -7,8 +7,8 @@ interface ResponseDictionary {
   [index: number]: IdTextPair;
 }
 
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY3;
-const VOICE_ID = "ODq5zmih8GrVes37Dizd"; // Patrick;
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY4;
+const VOICE_ID = "CYw3kZ02Hs0563khs1Fj"; // Dave (https://elevenlabs.io/docs/voices/premade-voices);
 const FIRST_INDEX_LATENCY = 1; // integer 0-4 (higher = faster but worse quality)
 
 if (!ELEVENLABS_API_KEY) {
@@ -80,7 +80,9 @@ export const createAudioStreamFromText = async (
   const id = response.headers.get("request-id");
 
   if (!response.ok || !id || !response.body) {
-    throw new Error("No response body or ID received from ElevenLabs API");
+    throw new Error(`No response body or ID received from ElevenLabs API. 
+    Given Status ${response.status} and Text ${response.statusText}. If status 
+    is 401 we have exceeded the API limit.`);
   }
 
   previousResponses[index] = { id: id, text: text };

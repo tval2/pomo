@@ -1,73 +1,103 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
-import { LLMData, callChat, callLLM, stopLLMAudio } from "../utils/llm";
+import { useCallback, useState, useRef, useEffect } from "react";
+import { LLMData, callChat, callLLM, setAudioEnabled } from "../utils/llm";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
 
-enum DataType {
-  IMAGE = 0,
-  AUDIO,
-};
+interface Response {
+  id: number;
+  text: string;
+}
+
+const MAX_RECENT_IMAGES = 1;
+const DEFAULT_SEND_PHOTOS = true;
+const DEFAULT_SEND_AUDIO = true;
+const DEFAULT_PLAY_AUDIO = true;
 
 export default function Pomo() {
-  const [imageQueue, setImageQueue] = useState<string[]>([]);
-  const [audioQueue, setAudioQueue] = useState<string[]>([]);
-  const [responses, setResponses] = useState<{ id: number; text: string }[]>(
-    []
-  );
-  const [clickResponses, setClickResponses] = useState<{ id: number; text: string }[]>(
-    []
-  );
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [responses, setResponses] = useState<Response[]>([]);
+  const [clickResponses, setClickResponses] = useState<Response[]>([]);
   const [isClickProcessing, setIsClickProcessing] = useState(false);
-  const [playAudio, setPlayAudio] = useState(false);
-  const [sendPhotos, setSendPhotos] = useState(false);
-  const [sendAudio, setSendAudio] = useState(false);
+  const [playAudio, setPlayAudio] = useState(DEFAULT_PLAY_AUDIO);
+  const [sendPhotos, setSendPhotos] = useState(DEFAULT_SEND_PHOTOS);
+  const [sendAudio, setSendAudio] = useState(DEFAULT_SEND_AUDIO);
+
   const responseId = useRef(0);
   const clickResponseId = useRef(0);
+  const isProcessingRef = useRef(false);
+  const playAudioRef = useRef(DEFAULT_PLAY_AUDIO);
+  const sendPhotosRef = useRef(DEFAULT_SEND_PHOTOS);
+  const sendAudioRef = useRef(DEFAULT_SEND_AUDIO);
+  const recentImagesRef = useRef<string[]>([]);
 
-  const addToQueue = (data: string, dataType: DataType) => {
-    switch (dataType) {
-      case DataType.IMAGE:
-        setImageQueue((prevQueue) => [...prevQueue, data]);
-        break;
-      case DataType.AUDIO:
-        setAudioQueue((prevQueue) => [...prevQueue, data]);
-        break;
-    }
-  };
+  useEffect(() => {
+    sendPhotosRef.current = sendPhotos;
+  }, [sendPhotos]);
 
-  const processQueue = useCallback(async () => {
-    if (imageQueue.length === 0 || audioQueue.length === 0 || isProcessing) return;
+  useEffect(() => {
+    sendAudioRef.current = sendAudio;
+  }, [sendAudio]);
 
-    setIsProcessing(true);
-    let data: LLMData = {};
-    if (sendPhotos && imageQueue[0].startsWith("data:image")) {
-      data.image = imageQueue[0];
-    }
-    if (sendAudio && audioQueue[0].startsWith("data:audio")) {
-      data.audio = audioQueue[0];
-    }
+  useEffect(() => {
+    playAudioRef.current = playAudio;
+  }, [playAudio]);
 
-    try {
-      responseId.current = await callChat(
-        data,
-        responseId.current,
-        setResponses
-      );
-      setImageQueue((prevQueue) => prevQueue.slice(1));
-      setAudioQueue((prevQueue) => prevQueue.slice(1));
-    } catch (error) {
-      console.error("Error processing queue item:", error);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [imageQueue, audioQueue, isProcessing, responseId]);
+  const processAudioWithImages = useCallback(
+    async (audioData: string) => {
+      if (isProcessingRef.current) {
+        return;
+      }
+
+      isProcessingRef.current = true;
+
+      const data: LLMData = {};
+
+      if (sendAudioRef.current) {
+        data.audio = audioData;
+      }
+
+      if (sendPhotosRef.current && recentImagesRef.current.length > 0) {
+        data.images = recentImagesRef.current;
+      }
+
+      try {
+        responseId.current = await callChat(
+          data,
+          responseId.current,
+          setResponses,
+          playAudio
+        );
+
+        if (sendPhotosRef.current && recentImagesRef.current.length > 0) {
+          recentImagesRef.current = [];
+        }
+      } catch (error) {
+        console.error("Error processing audio with images:", error);
+      } finally {
+        isProcessingRef.current = false;
+      }
+    },
+    [playAudio]
+  );
+
+  const handleNewImage = useCallback((imageData: string) => {
+    recentImagesRef.current = [
+      imageData,
+      ...recentImagesRef.current.slice(0, MAX_RECENT_IMAGES - 1),
+    ];
+  }, []);
+
+  const handleNewAudio = useCallback(
+    (audioData: string) => {
+      processAudioWithImages(audioData);
+    },
+    [processAudioWithImages]
+  );
 
   const processClick = useCallback(async (image: string, coords: string) => {
-    let data: LLMData = { image: image, text: coords };
+    let data: LLMData = { images: [image], text: coords };
 
     setIsClickProcessing(true);
     try {
@@ -81,71 +111,62 @@ export default function Pomo() {
     } finally {
       setIsClickProcessing(false);
     }
-  }, [isClickProcessing, clickResponseId]);
+  }, []);
 
-  useEffect(() => {
-    processQueue();
-  }, [imageQueue, audioQueue, processQueue]);
+  const toggleAudioOutput = useCallback(() => {
+    playAudioRef.current = !playAudioRef.current;
+    setPlayAudio(playAudioRef.current);
+    setAudioEnabled(playAudioRef.current);
+  }, []);
 
-  const toggleAudio = () => {
-    if (playAudio) {
-      stopLLMAudio();
-    }
-    setPlayAudio(!playAudio);
-  };
+  const toggleSendPhotos = useCallback(() => {
+    setSendPhotos((prev) => !prev);
+  }, []);
 
-  const toggleSendPhotos = () => {
-    setSendPhotos(!sendPhotos);
-  };
-
-  const toggleSendAudio = () => {
-    setSendAudio(!sendAudio);
-  };
+  const toggleSendAudio = useCallback(() => {
+    setSendAudio((prev) => !prev);
+  }, []);
 
   return (
     <div className="w-full h-full relative p-4">
       <WebcamVideo
-        onNewData={(data: string) => {
-          addToQueue(data, DataType.IMAGE);
-        }}
+        onNewData={handleNewImage}
         onClick={(data: string, x: number, y: number) => {
           processClick(data, JSON.stringify({ x: x, y: y }));
         }}
       />
-      <WebcamAudio
-        onNewData={(data: string) => {
-          addToQueue(data, DataType.AUDIO);
-        }}
-      />
+      <WebcamAudio onNewData={handleNewAudio} />
       <div>
         <button
-          className={`px-4 py-2 rounded ${playAudio ? "bg-green-500" : "bg-red-500"
-            } text-white`}
-          onClick={toggleAudio}
+          className={`px-4 py-2 rounded ${
+            playAudio ? "bg-green-500" : "bg-red-500"
+          } text-white`}
+          onClick={toggleAudioOutput}
         >
           {playAudio ? "TTS On" : "TTS Off"}
         </button>
         <button
-          className={`px-4 py-2 rounded ${sendPhotos ? "bg-green-500" : "bg-red-500"
-            } text-white`}
+          className={`px-4 py-2 rounded ${
+            sendPhotos ? "bg-green-500" : "bg-red-500"
+          } text-white`}
           onClick={toggleSendPhotos}
         >
           {sendPhotos ? "Sending images" : "Not sending images"}
         </button>
         <button
-          className={`px-4 py-2 rounded ${sendAudio ? "bg-green-500" : "bg-red-500"
-            } text-white`}
+          className={`px-4 py-2 rounded ${
+            sendAudio ? "bg-green-500" : "bg-red-500"
+          } text-white`}
           onClick={toggleSendAudio}
         >
           {sendAudio ? "Sending audio" : "Not sending audio"}
         </button>
       </div>
-      {clickResponses.length > 0 ?
+      {clickResponses.length > 0 && (
         <p className="message mb-2 p-2">
           {"Responding as: " + clickResponses[clickResponses.length - 1].text}
         </p>
-        : null
-      }
+      )}
       <TextFeed responses={responses} />
     </div>
   );

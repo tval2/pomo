@@ -47,19 +47,19 @@ const getPrompt = (coords: string) => {
   return `Identify the object at the normalized pixel coordinates ${coords} in this
   photo. Provide a succinct, simple description and nothing else. If the object is
   part of a larger object, identify the larger object. For example, if the coordinates
-  are for someones hand or nose, and you can see more of the person, identify the person.`
-}
+  are for someones hand or nose, and you can see more of the person, identify the person.`;
+};
 
 export async function promptLLM(data: LLMData) {
   if (!data) {
     throw new Error("No data provided in promptLLM");
   }
 
-  if (!data.image || !data.text) {
+  if (!data.images || !data.text) {
     throw new Error("Missing image or text in promptLLM");
   }
 
-  const parts = data.image.split(",");
+  const parts = data.images[0].split(",");
   if (parts.length !== 2) {
     throw new Error("Invalid image data format");
   }
@@ -73,7 +73,10 @@ export async function promptLLM(data: LLMData) {
   };
 
   try {
-    const result = await model.generateContent([getPrompt(data.text), imagePart]);
+    const result = await model.generateContent([
+      getPrompt(data.text),
+      imagePart,
+    ]);
     const response = result.response;
     return response.text();
   } catch (error) {
