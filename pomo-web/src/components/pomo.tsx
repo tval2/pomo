@@ -12,20 +12,24 @@ interface Response {
 }
 
 const MAX_RECENT_IMAGES = 1;
+const DEFAULT_SEND_PHOTOS = true;
+const DEFAULT_SEND_AUDIO = true;
+const DEFAULT_PLAY_AUDIO = true;
 
 export default function Pomo() {
   const [responses, setResponses] = useState<Response[]>([]);
   const [clickResponses, setClickResponses] = useState<Response[]>([]);
   const [isClickProcessing, setIsClickProcessing] = useState(false);
-  const [playAudio, setPlayAudio] = useState(false);
-  const [sendPhotos, setSendPhotos] = useState(false);
-  const [sendAudio, setSendAudio] = useState(false);
+  const [playAudio, setPlayAudio] = useState(DEFAULT_PLAY_AUDIO);
+  const [sendPhotos, setSendPhotos] = useState(DEFAULT_SEND_PHOTOS);
+  const [sendAudio, setSendAudio] = useState(DEFAULT_SEND_AUDIO);
 
   const responseId = useRef(0);
   const clickResponseId = useRef(0);
   const isProcessingRef = useRef(false);
-  const sendPhotosRef = useRef(false);
-  const sendAudioRef = useRef(false);
+  const playAudioRef = useRef(DEFAULT_PLAY_AUDIO);
+  const sendPhotosRef = useRef(DEFAULT_SEND_PHOTOS);
+  const sendAudioRef = useRef(DEFAULT_SEND_AUDIO);
   const recentImagesRef = useRef<string[]>([]);
 
   useEffect(() => {
@@ -35,6 +39,10 @@ export default function Pomo() {
   useEffect(() => {
     sendAudioRef.current = sendAudio;
   }, [sendAudio]);
+
+  useEffect(() => {
+    playAudioRef.current = playAudio;
+  }, [playAudio]);
 
   const processAudioWithImages = useCallback(
     async (audioData: string) => {
@@ -106,10 +114,9 @@ export default function Pomo() {
   }, []);
 
   const toggleAudioOutput = useCallback(() => {
-    setPlayAudio((prev) => {
-      setAudioEnabled(!prev);
-      return !prev;
-    });
+    playAudioRef.current = !playAudioRef.current;
+    setPlayAudio(playAudioRef.current);
+    setAudioEnabled(playAudioRef.current);
   }, []);
 
   const toggleSendPhotos = useCallback(() => {
