@@ -5,6 +5,7 @@ import { LLMData, callChat, callLLM, setAudioEnabled } from "../utils/llm";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
+import { AudioVisualizer } from "./audioviz";
 
 interface Response {
   id: number;
@@ -167,6 +168,7 @@ export default function Pomo() {
           {"Responding as: " + clickResponses[clickResponses.length - 1].text}
         </p>
       )}
+      <AudioVisualizer />
       <TextFeed responses={responses} />
     </div>
   );
