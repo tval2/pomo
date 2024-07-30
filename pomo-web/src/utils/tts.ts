@@ -1,7 +1,10 @@
 import { cleanTextPlayed } from "./helpers";
-import { getAudioContext, connectToAnalyser } from "../utils/audio";
+import {
+  getAudioContext,
+  connectToAnalyser,
+  stopCurrentAudio,
+} from "./audioContextManager";
 
-export let audioContext: AudioContext | null = null;
 let audioEnabled = true;
 
 interface QueueItem {
@@ -14,7 +17,7 @@ interface QueueItem {
 }
 
 let audioQueue: QueueItem[] = [];
-let isPlaying = false;
+export let isPlaying = false;
 let isFetching = false;
 let currentIndex = 0;
 let lastActivityTimestamp = Date.now();
@@ -125,7 +128,7 @@ export async function streamTTS(item: QueueItem): Promise<AudioBuffer> {
     throw new Error("streamTTS called in a non-browser environment");
   }
 
-  const audioContext = getAudioContext();
+  const audioCtx = getAudioContext();
 
   const response = await fetch("/api/tts", {
     method: "POST",
@@ -145,7 +148,7 @@ export async function streamTTS(item: QueueItem): Promise<AudioBuffer> {
   }
 
   const arrayBuffer = await response.arrayBuffer();
-  return await audioContext.decodeAudioData(arrayBuffer);
+  return await audioCtx.decodeAudioData(arrayBuffer);
 }
 
 async function playNextInQueue() {
@@ -166,8 +169,8 @@ async function playNextInQueue() {
 
   const audioCtx = getAudioContext();
   const source = audioCtx.createBufferSource();
-
   source.buffer = firstItem.audioBuffer!;
+
   connectToAnalyser(source);
   source.connect(audioCtx.destination);
 
@@ -184,11 +187,8 @@ async function playNextInQueue() {
 }
 
 export function stopAudio() {
+  stopCurrentAudio();
   audioQueue = [];
-  if (audioContext) {
-    audioContext.close();
-    audioContext = null;
-  }
   isPlaying = false;
   isFetching = false;
   currentIndex = 0;

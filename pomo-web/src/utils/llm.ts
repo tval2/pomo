@@ -1,8 +1,4 @@
-import {
-  queueAudioText,
-  stopAudio,
-  setAudioEnabled as setTTSAudioEnabled,
-} from "./tts";
+import { queueAudioText } from "./tts";
 import { isEndOfSentence, processChunk } from "./helpers";
 
 type Response = { id: number; text: string };
@@ -135,12 +131,4 @@ export async function callLLM(
     console.error("Error calling llm API:", error);
     return responseId;
   }
-}
-
-export function setAudioEnabled(enabled: boolean) {
-  setTTSAudioEnabled(enabled);
-}
-
-export function stopLLMAudio() {
-  stopAudio();
 }
