@@ -1,5 +1,9 @@
 import { cleanTextPlayed } from "./helpers";
-import { getAudioContext, connectToAnalyser } from "../utils/audio";
+import {
+  getAudioContext,
+  connectToAnalyser,
+  stopCurrentAudio,
+} from "./audioContextManager";
 
 let audioEnabled = true;
 
@@ -165,8 +169,8 @@ async function playNextInQueue() {
 
   const audioCtx = getAudioContext();
   const source = audioCtx.createBufferSource();
-
   source.buffer = firstItem.audioBuffer!;
+
   connectToAnalyser(source);
   source.connect(audioCtx.destination);
 
@@ -183,12 +187,8 @@ async function playNextInQueue() {
 }
 
 export function stopAudio() {
-  console.log("Stopping audio");
-  const audioCtx = getAudioContext();
+  stopCurrentAudio();
   audioQueue = [];
-  if (audioCtx) {
-    audioCtx.close();
-  }
   isPlaying = false;
   isFetching = false;
   currentIndex = 0;

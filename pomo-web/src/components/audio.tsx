@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { stopAudio, isPlaying } from "../utils//tts";
+import { stopAudio, isPlaying } from "../utils/tts";
 import { WebVoiceProcessor } from "@picovoice/web-voice-processor";
 import { WaveFile } from "wavefile";
 
@@ -74,8 +74,9 @@ export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
         }
 
         if (voiceProbability > VAD_THRESHOLD) {
-          console.log("isPlaying: ", isPlaying);
-          stopAudio();
+          if (isPlaying) {
+            stopAudio();
+          }
 
           if (audioChunksRef.current.length === 0) {
             audioChunksRef.current = [...rollingBufferRef.current];

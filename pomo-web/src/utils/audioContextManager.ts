@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 
 let audioContext: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
+let currentSource: AudioBufferSourceNode | null = null;
 
 export function getAudioContext(): AudioContext {
   if (!audioContext) {
@@ -21,9 +22,18 @@ export function getAnalyser(): AnalyserNode {
   return analyser;
 }
 
-export function connectToAnalyser(sourceNode: AudioNode): void {
+export function connectToAnalyser(sourceNode: AudioBufferSourceNode): void {
   const analyserNode = getAnalyser();
   sourceNode.connect(analyserNode);
+  currentSource = sourceNode;
+}
+
+export function stopCurrentAudio(): void {
+  if (currentSource) {
+    currentSource.stop();
+    currentSource.disconnect();
+    currentSource = null;
+  }
 }
 
 export function useAudioAnalyzer() {

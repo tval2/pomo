@@ -1,13 +1,9 @@
 import React, { useEffect } from "react";
-import { useAudioAnalyzer } from "../utils/audio";
+import { useAudioAnalyzer } from "../utils/audioContextManager";
 
 export const AudioVisualizer: React.FC = () => {
   const { volume } = useAudioAnalyzer();
   const iconSize = 20 + volume * 80;
-
-  useEffect(() => {
-    console.log("Volume:", volume);
-  }, [volume]);
 
   return (
     <div
