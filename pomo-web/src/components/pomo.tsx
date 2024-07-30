@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useState, useRef, useEffect } from "react";
-import { LLMData, callChat, callLLM, setAudioEnabled } from "../utils/llm";
+import { LLMData, callChat, callLLM } from "../utils/llm";
+import { setAudioEnabled } from "../utils/tts";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
