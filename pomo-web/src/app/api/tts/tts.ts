@@ -71,13 +71,13 @@ export const createAudioStreamFromText = async (
     optimize_streaming_latency: index === 0 ? FIRST_INDEX_LATENCY : 0,
   };
 
-  if (!options.next_text) {
+  if (!options.next_text && index !== 0) {
     console.log("No next text provided for index ", index);
   }
-  if (!options.previous_text) {
+  if (!options.previous_text && index !== 0) {
     console.log("No prev text provided for index ", index);
   }
-  if (!options.previous_request_ids) {
+  if (!options.previous_request_ids && index !== 0) {
     console.log("No prev text ID provided for index ", index);
   }
 
