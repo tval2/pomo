@@ -7,6 +7,7 @@ import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
 import { AudioVisualizer } from "./audioviz";
+import { log } from "../utils/performance";
 
 interface Response {
   id: number;
@@ -130,7 +131,7 @@ export default function Pomo() {
   }, []);
 
   return (
-    <div className="w-full h-full relative p-4">
+    <div className="w-full h-full relative p-4 space-y-4">
       <WebcamVideo
         onNewData={handleNewImage}
         onClick={(data: string, x: number, y: number) => {

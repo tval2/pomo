@@ -75,6 +75,7 @@ const chat = model.startChat({
     maxOutputTokens: 100,
   },
 });
+console.log("Chat started");
 
 function processDataUri(str: string) {
   const parts = str.split(",");
@@ -128,7 +129,9 @@ export async function sendMessage2LLM(data: LLMData) {
   const messageData = configureLlmData(data);
 
   try {
+    let lastLogTime = Date.now();
     const result = await chat.sendMessageStream(messageData);
+    console.log(`[+${Date.now() - lastLogTime}ms] ${"raw Gemini call length"}`);
     return result;
   } catch (error) {
     console.error("Error generating content:", error);

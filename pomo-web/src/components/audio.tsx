@@ -2,11 +2,13 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { stopAudio, isPlaying } from "../utils/tts";
 import { WebVoiceProcessor } from "@picovoice/web-voice-processor";
 import { WaveFile } from "wavefile";
+import { log } from "../utils/performance";
+import { LinearProgressProcessing, LinearProgressWithLabel } from "../ui/audio";
 
 // currently sampling at 16kHz (16,000 samples per second) @ frame rate of
 //  512 samples per frame, which is 31.25 frames per second (or 0.032 seconds per frame).
-const VAD_THRESHOLD = 0.7; // require a probability of at least 70% to track voice
-const DELAY_AFTER_VOICE_MS = 1700; // wait 1.7 seconds after voice stops before sending audio
+const VAD_THRESHOLD = 0.85; // require a probability of at least 85% to track voice
+const DELAY_AFTER_VOICE_MS = 1300; // wait 1.3 seconds after voice stops before sending audio
 const ROLLING_BUFFER_SIZE = 32; // grab the previous 15 frames (or the previous 1 second)
 
 interface WebcamAudioProps {
@@ -16,11 +18,23 @@ interface WebcamAudioProps {
 export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [voiceProbability, setVoiceProbability] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
   const engineRef = useRef<any>(null);
   const audioChunksRef = useRef<Int16Array[]>([]);
   const rollingBufferRef = useRef<Int16Array[]>([]);
   const lastVoiceDetectionRef = useRef<number | null>(null);
   const sendAudioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    audioRef.current = new Audio("/sendAudio.mp3");
+  }, []);
+
+  useEffect(() => {
+    if (isPlaying) {
+      setIsProcessing(false);
+    }
+  }, [isPlaying]);
 
   function convertPCMToWav(pcmData: Int16Array, sampleRate = 16000) {
     const wav = new WaveFile();
@@ -29,7 +43,13 @@ export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
   }
 
   const sendAudioToLLM = useCallback(() => {
+    log("VAD ended, calling sendAudiotoLLM", "vadEnd");
     if (audioChunksRef.current.length > 0) {
+      setIsProcessing(true);
+      if (audioRef.current) {
+        audioRef.current.play();
+      }
+
       const totalLength = audioChunksRef.current.reduce(
         (acc, chunk) => acc + chunk.length,
         0
@@ -74,6 +94,7 @@ export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
         }
 
         if (voiceProbability > VAD_THRESHOLD) {
+          setIsProcessing(false);
           if (isPlaying) {
             stopAudio();
           }
@@ -91,6 +112,7 @@ export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
           }
         } else if (audioChunksRef.current.length > 0) {
           if (sendAudioTimeoutRef.current === null) {
+            log("VAD undetected", "any");
             sendAudioTimeoutRef.current = setTimeout(() => {
               sendAudioToLLM();
               sendAudioTimeoutRef.current = null;
@@ -152,36 +174,26 @@ export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
     };
   }, []);
 
-  const percentage = voiceProbability * 100;
-  const barLength = Math.floor((percentage / 10) * 3);
-  const emptyLength = 30 - barLength;
-  const spacer = ` `.repeat(3 - percentage.toFixed(0).length);
-  const buttonClasses = `py-2 px-4 text-lg font-bold rounded cursor-pointer transition-colors duration-300 ${
+  const renderVoiceBar = () => {
+    if (isProcessing) {
+      return <LinearProgressProcessing />;
+    } else {
+      return (
+        <LinearProgressWithLabel value={Math.floor(voiceProbability * 100)} />
+      );
+    }
+  };
+
+  const buttonClasses = `py-2 px-4 text-base font-semibold rounded cursor-pointer transition-colors duration-300 ${
     isRecording ? "bg-green-500" : "bg-red-500"
   } text-white`;
 
   return (
-    <div>
-      <div className="flex items-center space-x-4">
-        <button onClick={toggleRecording} className={buttonClasses}>
-          {isRecording ? "Stop Recording" : "Start Recording"}
-        </button>
-        <div
-          style={{
-            marginTop: "20px",
-            fontFamily: "monospace",
-            whiteSpace: "pre",
-          }}
-        >
-          Voice Probability:
-          <div style={{ marginTop: "5px" }}>
-            [{spacer}
-            {percentage.toFixed(0)}]|
-            {"█".repeat(barLength)}
-            {" ".repeat(emptyLength)}|
-          </div>
-        </div>
-      </div>
+    <div className="flex flex-col items-start space-y-4">
+      <button onClick={toggleRecording} className={buttonClasses}>
+        {isRecording ? "Stop Recording" : "Start Recording"}
+      </button>
+      <div className="w-full max-w-md">{renderVoiceBar()}</div>
     </div>
   );
 }
