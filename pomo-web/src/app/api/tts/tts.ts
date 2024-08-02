@@ -63,7 +63,7 @@ export const createAudioStreamFromText = async (
   const { ids: prev_ids, texts: prev_texts } = getLastThreeIds(index);
 
   const options = {
-    model_id: "eleven_turbo_v2",
+    model_id: "eleven_turbo_v2_5",
     text: text,
     previous_text: prev_texts.length == 0 ? undefined : prev_texts.join(" "),
     next_text: next_texts.length == 0 ? undefined : next_texts.join(" "),
@@ -71,11 +71,25 @@ export const createAudioStreamFromText = async (
     optimize_streaming_latency: index === 0 ? FIRST_INDEX_LATENCY : 0,
   };
 
+  if (!options.next_text) {
+    console.log("No next text provided for index ", index);
+  }
+  if (!options.previous_text) {
+    console.log("No prev text provided for index ", index);
+  }
+  if (!options.previous_request_ids) {
+    console.log("No prev text ID provided for index ", index);
+  }
+
+  let lastLogTime = Date.now();
   const response = await fetch(url, {
     method: "POST",
     headers: headers,
     body: JSON.stringify(options),
   });
+  console.log(
+    `[+${Date.now() - lastLogTime}ms] ${"raw ElevenLabs call length"}`
+  );
 
   const id = response.headers.get("request-id");
 

@@ -3,6 +3,10 @@ import { createAudioStreamFromText } from "./tts";
 
 export async function POST(req: NextRequest) {
   try {
+    if (req.headers.get("X-Warmup") === "true") {
+      return NextResponse.json({ status: "ok" }, { status: 200 });
+    }
+
     const { text, next_texts, index } = await req.json();
     if (!text) {
       return new Response(

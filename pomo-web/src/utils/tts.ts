@@ -4,6 +4,7 @@ import {
   connectToAnalyser,
   stopCurrentAudio,
 } from "./audioContextManager";
+import { log } from "./performance";
 
 let audioEnabled = true;
 
@@ -17,8 +18,8 @@ interface QueueItem {
 }
 
 let audioQueue: QueueItem[] = [];
+const readyList: Set<number> = new Set();
 export let isPlaying = false;
-let isFetching = false;
 let currentIndex = 0;
 let lastActivityTimestamp = Date.now();
 
@@ -26,7 +27,7 @@ const MAX_CONCURRENT_FETCHES = 3;
 const MAX_CONTEXT_ITEMS = 3;
 const MIN_NEXT_TEXTS = 1;
 const MAX_WAIT_TIME = 3000;
-const INACTIVITY_THRESHOLD = 10000;
+const RETRY_FETCH_DELAY = 50;
 
 function isSentenceEnding(text: string): boolean {
   const trimmedText = text.trim();
@@ -55,11 +56,11 @@ export async function queueAudioText(text: string, enabled: boolean) {
     lastActivityTimestamp = Date.now();
   }
 
-  if (!isPlaying && audioEnabled) {
-    playNextInQueue();
-  }
-  if (!isFetching && audioEnabled) {
+  if (audioEnabled) {
     fetchNextAudio();
+    if (!isPlaying) {
+      playNextInQueue();
+    }
   }
 }
 
@@ -74,9 +75,37 @@ function updateContextForQueueItems(newItem: QueueItem): void {
   }
 }
 
+function waitStatus(item: QueueItem): boolean {
+  if (item.index === 0) {
+    return false;
+  }
+
+  // If the previous item hasn't been processed yet, wait
+  if (!readyList.has(item.index - 1)) {
+    return true;
+  }
+
+  // If the sentence is ending, don't wait
+  if (isSentenceEnding(item.text)) {
+    return false;
+  }
+
+  // If the following text has been added to the queue, don't wait
+  if (item.nextTexts.length >= MIN_NEXT_TEXTS) {
+    return false;
+  }
+
+  // If we've already been waiting long enough, don't wait
+  if (Date.now() - item.createdAt >= MAX_WAIT_TIME) {
+    return false;
+  }
+
+  // Default case: wait
+  return true;
+}
+
 async function fetchNextAudio() {
   if (audioQueue.length === 0) {
-    isFetching = false;
     return;
   }
 
@@ -87,21 +116,13 @@ async function fetchNextAudio() {
     pendingItems.length === 0 ||
     fetchingItems.length >= MAX_CONCURRENT_FETCHES
   ) {
-    isFetching = false;
     return;
   }
 
-  isFetching = true;
   const item = pendingItems[0];
 
-  const shouldWait =
-    !isSentenceEnding(item.text) &&
-    item.nextTexts.length < MIN_NEXT_TEXTS &&
-    Date.now() - item.createdAt < MAX_WAIT_TIME &&
-    Date.now() - lastActivityTimestamp < INACTIVITY_THRESHOLD;
-
-  if (shouldWait) {
-    setTimeout(fetchNextAudio, 100); // Check again after a short delay
+  if (waitStatus(item)) {
+    setTimeout(fetchNextAudio, RETRY_FETCH_DELAY); // Check again after a short delay
     return;
   }
 
@@ -109,8 +130,9 @@ async function fetchNextAudio() {
 
   try {
     const audioBuffer = await streamTTS(item);
-    item.audioBuffer = audioBuffer;
     item.status = "ready";
+    readyList.add(item.index);
+    item.audioBuffer = audioBuffer;
 
     if (!isPlaying) {
       playNextInQueue();
@@ -130,6 +152,7 @@ export async function streamTTS(item: QueueItem): Promise<AudioBuffer> {
 
   const audioCtx = getAudioContext();
 
+  log("calling ElevenLabs API", "tts1");
   const response = await fetch("/api/tts", {
     method: "POST",
     headers: {
@@ -141,6 +164,7 @@ export async function streamTTS(item: QueueItem): Promise<AudioBuffer> {
       index: item.index,
     }),
   });
+  log("received ElevenLabs API", "tts2");
 
   if (!response.ok) {
     const errorData = await response.json();
@@ -180,17 +204,15 @@ async function playNextInQueue() {
   };
 
   source.start();
+  log("starting speech", "audio");
 
-  if (!isFetching) {
-    fetchNextAudio();
-  }
+  fetchNextAudio();
 }
 
 export function stopAudio() {
   stopCurrentAudio();
   audioQueue = [];
   isPlaying = false;
-  isFetching = false;
   currentIndex = 0;
 }
 

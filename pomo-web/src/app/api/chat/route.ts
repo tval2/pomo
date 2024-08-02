@@ -3,6 +3,10 @@ import { sendMessage2LLM } from "./chat";
 
 export async function POST(req: NextRequest) {
   try {
+    if (req.headers.get("X-Warmup") === "true") {
+      return NextResponse.json({ status: "ok" }, { status: 200 });
+    }
+
     const body = await req.json();
     if (!body) {
       return new Response(

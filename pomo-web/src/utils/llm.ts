@@ -1,5 +1,6 @@
 import { queueAudioText } from "./tts";
 import { isEndOfSentence, processChunk } from "./helpers";
+import { log } from "./performance";
 
 type Response = { id: number; text: string };
 
@@ -16,6 +17,7 @@ export async function callChat(
   }
 
   try {
+    log("calling Gemini API", "llm1");
     const response = await fetch("/api/chat", {
       method: "POST",
       body: JSON.stringify(data),
@@ -23,6 +25,7 @@ export async function callChat(
         "Content-Type": "application/json",
       },
     });
+    log("received Gemini API", "llm2");
 
     if (!response.ok) {
       const errorText = await response.text();
