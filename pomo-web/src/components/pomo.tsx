@@ -42,6 +42,7 @@ export default function Pomo() {
   const sendPhotosRef = useRef(DEFAULT_SEND_PHOTOS);
   const sendAudioRef = useRef(DEFAULT_SEND_AUDIO);
   const recentImagesRef = useRef<string[]>([]);
+  const selectedObjectRef = useRef<string>();
 
   const { volume } = useAudioAnalyzer();
 
@@ -73,6 +74,10 @@ export default function Pomo() {
 
       if (sendPhotosRef.current && recentImagesRef.current.length > 0) {
         data.images = recentImagesRef.current;
+      }
+
+      if (selectedObjectRef.current) {
+        data.text = selectedObjectRef.current;
       }
 
       try {
@@ -109,8 +114,8 @@ export default function Pomo() {
     [processAudioWithImages]
   );
 
-  const processClick = useCallback(async (image: string, coords: string) => {
-    let data: LLMData = { images: [image], text: coords };
+  const processClick = useCallback(async (images: string[]) => {
+    let data: LLMData = { images: images };
 
     setIsClickProcessing(true);
     try {
@@ -144,6 +149,12 @@ export default function Pomo() {
     setIsRecording((prev) => !prev);
   }, []);
 
+  useEffect(() => {
+    if (clickResponses.length > 0) {
+      selectedObjectRef.current = clickResponses[clickResponses.length - 1].text;
+    }
+  }, [clickResponses]);
+
   return (
     <Box
       sx={{
@@ -155,8 +166,8 @@ export default function Pomo() {
     >
       <WebcamVideo
         onNewData={handleNewImage}
-        onClick={(data, x, y) => {
-          processClick(data, JSON.stringify({ x, y }));
+        onClick={(data: string[]) => {
+          processClick(data);
         }}
       />
       <Box
