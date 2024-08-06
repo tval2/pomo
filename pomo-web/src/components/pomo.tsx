@@ -34,6 +34,7 @@ export default function Pomo() {
   const sendPhotosRef = useRef(DEFAULT_SEND_PHOTOS);
   const sendAudioRef = useRef(DEFAULT_SEND_AUDIO);
   const recentImagesRef = useRef<string[]>([]);
+  const selectedObjectRef = useRef<string>();
 
   useEffect(() => {
     sendPhotosRef.current = sendPhotos;
@@ -63,6 +64,10 @@ export default function Pomo() {
 
       if (sendPhotosRef.current && recentImagesRef.current.length > 0) {
         data.images = recentImagesRef.current;
+      }
+
+      if (selectedObjectRef.current) {
+        data.text = selectedObjectRef.current;
       }
 
       try {
@@ -99,8 +104,8 @@ export default function Pomo() {
     [processAudioWithImages]
   );
 
-  const processClick = useCallback(async (image: string, coords: string) => {
-    let data: LLMData = { images: [image], text: coords };
+  const processClick = useCallback(async (images: string[]) => {
+    let data: LLMData = { images: images };
 
     setIsClickProcessing(true);
     try {
@@ -130,12 +135,18 @@ export default function Pomo() {
     setSendAudio((prev) => !prev);
   }, []);
 
+  useEffect(() => {
+    if (clickResponses.length > 0) {
+      selectedObjectRef.current = clickResponses[clickResponses.length - 1].text;
+    }
+  }, [clickResponses]);
+
   return (
     <div className="w-full h-full relative p-4 space-y-4">
       <WebcamVideo
         onNewData={handleNewImage}
-        onClick={(data: string, x: number, y: number) => {
-          processClick(data, JSON.stringify({ x: x, y: y }));
+        onClick={(data: string[]) => {
+          processClick(data);
         }}
       />
       <WebcamAudio onNewData={handleNewAudio} />

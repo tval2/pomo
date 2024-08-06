@@ -43,40 +43,41 @@ const model = genAI.getGenerativeModel({
   generationConfig: generationConfig,
 });
 
-const getPrompt = (coords: string) => {
-  return `Identify the object at the normalized pixel coordinates ${coords} in this
-  photo. Provide a succinct, simple description and nothing else. If the object is
-  part of a larger object, identify the larger object. For example, if the coordinates
-  are for someones hand or nose, and you can see more of the person, identify the person.`;
-};
+const prompt = `Here are two images. The first is a screenshot from a webcam. The second is the same image,
+but with everything masked out in black except for an object of interest. Identify the object of interest in
+the context of the full image using a simple description. No more than just a word or a few words. If the
+object is part of a larger object, identify the larger object. For example, if the object of interest is a
+hand and you can see the rest of the person, identify the person, or if the object of interest is a cushion
+and you can see the rest of the couch, identify the couch.`
 
 export async function promptLLM(data: LLMData) {
   if (!data) {
     throw new Error("No data provided in promptLLM");
   }
 
-  if (!data.images || !data.text) {
-    throw new Error("Missing image or text in promptLLM");
+  if (!data.images) {
+    throw new Error("Missing images in promptLLM");
   }
 
-  const parts = data.images[0].split(",");
-  if (parts.length !== 2) {
-    throw new Error("Invalid image data format");
-  }
+  let dataParts: any[] = [prompt];
+  for (let image of data.images) {
+    const parts = image.split(",");
+    if (parts.length !== 2) {
+      throw new Error("Invalid image data format");
+    }
 
-  const base64Data = parts[1];
-  const imagePart = {
-    inlineData: {
-      mimeType: "image/png",
-      data: base64Data,
-    },
-  };
+    const base64Data = parts[1];
+    const imagePart = {
+      inlineData: {
+        mimeType: "image/png",
+        data: base64Data,
+      },
+    };
+    dataParts.push(imagePart);
+  }
 
   try {
-    const result = await model.generateContent([
-      getPrompt(data.text),
-      imagePart,
-    ]);
+    const result = await model.generateContent(dataParts);
     const response = result.response;
     return response.text();
   } catch (error) {
