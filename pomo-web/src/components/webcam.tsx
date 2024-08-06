@@ -36,10 +36,11 @@ let clickPos: {
   y: number;
 } | undefined;
 let clickTime: number;
+let prevHadClicked = false;
 
 interface WebcamVideoProps {
   onNewData: (data: string) => void;
-  onClick: (data: string, x: number, y: number) => void;
+  onClick: (data: string[]) => void;
 }
 
 export default function WebcamVideo(props: WebcamVideoProps) {
@@ -49,7 +50,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
   const maskRef = useRef<HTMLCanvasElement>(null);
   const clickPosRef = useRef<HTMLDivElement>(null);
 
-  const takeScreenshot = useCallback(() => {
+  const takeScreenshot = useCallback((maskData?: Uint8Array) => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
     if (!canvas || !video) {
@@ -61,6 +62,18 @@ export default function WebcamVideo(props: WebcamVideoProps) {
     let canvasContext = canvas.getContext("2d")!;
     canvasContext.scale(-1, 1);
     canvasContext.drawImage(video, 0, 0, -canvas.width, canvas.height);
+
+    if (maskData) {
+      canvasContext.fillStyle = "black";
+      for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+          if (maskData[x + y * canvas.width] < 0.99 * 255) {
+            canvasContext.fillRect(-(canvas.width - x) + 1, y, -1, 1);
+          }
+        }
+      }
+    }
+
     return canvas.toDataURL("image/png");
   }, [canvasRef]);
 
@@ -98,18 +111,29 @@ export default function WebcamVideo(props: WebcamVideoProps) {
 
   const onFrame = useCallback(() => {
     if (!segmenter || !videoRef.current || !clickPos) {
+      if (maskRef.current) {
+        maskRef.current.style.display = "none";
+      }
+      if (clickPosRef.current) {
+        clickPosRef.current.style.display = "none";
+      }
+      prevHadClicked = false;
       return;
     }
 
     if (clickPosRef.current) {
       clickPosRef.current.style.left = `${videoRef.current.offsetLeft + clickPos.x}px`;
       clickPosRef.current.style.top = `${videoRef.current.offsetTop + clickPos.y}px`;
+      if (SHOW_CLICK_POS) {
+        clickPosRef.current.style.display = "block";
+      }
     }
     videoRef.current.width = videoRef.current.videoWidth;
     videoRef.current.height = videoRef.current.videoHeight;
 
     // Segment
     let segmentPos = clickPos;
+    let segmentPrevHadClicked = prevHadClicked;
     segmenter.segment(
       videoRef.current,
       {
@@ -141,10 +165,20 @@ export default function WebcamVideo(props: WebcamVideoProps) {
         const ctx = canvas.getContext("webgl2")!;
 
         const maskData = mask.getAsUint8Array();
+
+        if (!segmentPrevHadClicked) {
+          let img = takeScreenshot();
+          let maskImg = takeScreenshot(maskData);
+          if (img && maskImg) {
+            props.onClick([img, maskImg]);
+          }
+        }
+
         let dt = new Date().getTime() / 1000 - clickTime;
         let clickPosNorm = { x: (1.0 - segmentPos.x / width), y: (1.0 - segmentPos.y / height) };
 
         colorizeAndBlurMask(ctx, width, height, maskData, dt, clickPosNorm);
+        maskRef.current.style.display = "block";
       }
     );
 
@@ -184,14 +218,11 @@ export default function WebcamVideo(props: WebcamVideoProps) {
       // update the previous frame
       frameGray.copyTo(oldGray);
     }
-  }, []);
 
-  useRequestAnimationFrame(onFrame, {
-    shouldAnimate:
-      segmenter !== undefined &&
-      videoRef.current !== undefined &&
-      clickPos !== undefined,
-  });
+    prevHadClicked = true;
+  }, [props, takeScreenshot]);
+
+  useRequestAnimationFrame(onFrame, {});
 
   useEffect(() => {
     async function setupWebcamVideo() {
@@ -251,19 +282,15 @@ export default function WebcamVideo(props: WebcamVideoProps) {
                 let rect = videoRef.current!.getBoundingClientRect();
                 let x = event.pageX - rect.left;
                 let y = event.clientY - rect.top;
-
-                let img = takeScreenshot();
-                if (img) {
-                  props.onClick(img, x / rect.width, y / rect.height);
-                }
-
-                clickTime = new Date().getTime() / 1000;
                 clickPos = { x: x, y: y };
+                clickTime = new Date().getTime() / 1000;
+
+                prevHadClicked = false;
               }
               : undefined
           }
         />
-        <canvas className={`absolute pointer-events-none ${clickPos ? "block" : "hidden"}`} ref={maskRef} />
+        <canvas className={`absolute pointer-events-none hidden`} ref={maskRef} />
         {clickPos && videoRef.current && SHOW_CLICK_POS ?
           <div
             className="absolute bg-red-500 w-[10px] h-[10px] translate-x-[-50%] translate-y-[-50%]"
