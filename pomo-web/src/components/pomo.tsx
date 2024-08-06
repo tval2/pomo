@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useState, useRef, useEffect } from "react";
+import React, { useCallback, useState, useRef, useEffect } from "react";
 import { LLMData, callChat, callLLM } from "../utils/llm";
 import { setAudioEnabled } from "../utils/tts";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
 import { AudioVisualizer } from "./audioviz";
-import { log } from "../utils/performance";
+import { Box, Drawer, IconButton, Typography, Tooltip } from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
+import { Mic, Volume2 } from "lucide-react";
 
 interface Response {
   id: number;
@@ -26,6 +28,8 @@ export default function Pomo() {
   const [playAudio, setPlayAudio] = useState(DEFAULT_PLAY_AUDIO);
   const [sendPhotos, setSendPhotos] = useState(DEFAULT_SEND_PHOTOS);
   const [sendAudio, setSendAudio] = useState(DEFAULT_SEND_AUDIO);
+  const [isRecording, setIsRecording] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const responseId = useRef(0);
   const clickResponseId = useRef(0);
@@ -130,48 +134,121 @@ export default function Pomo() {
     setSendAudio((prev) => !prev);
   }, []);
 
+  const toggleRecording = useCallback(() => {
+    setIsRecording((prev) => !prev);
+  }, []);
+
   return (
-    <div className="w-full h-full relative p-4 space-y-4">
+    <Box
+      sx={{
+        width: "100vw",
+        height: "100vh",
+        overflow: "hidden",
+        position: "relative",
+      }}
+    >
       <WebcamVideo
         onNewData={handleNewImage}
-        onClick={(data: string, x: number, y: number) => {
-          processClick(data, JSON.stringify({ x: x, y: y }));
+        onClick={(data, x, y) => {
+          processClick(data, JSON.stringify({ x, y }));
         }}
       />
-      <WebcamAudio onNewData={handleNewAudio} />
-      <div>
-        <button
-          className={`px-4 py-2 rounded ${
-            playAudio ? "bg-green-500" : "bg-red-500"
-          } text-white`}
-          onClick={toggleAudioOutput}
+      <Box
+        sx={{
+          position: "absolute",
+          bottom: 20,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 1000,
+        }}
+      >
+        <AudioVisualizer />
+        <WebcamAudio onNewData={handleNewAudio} isRecording />
+      </Box>
+      <Box
+        sx={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: "48px",
+          backgroundColor: "rgba(0, 0, 255, 0.5)",
+          transition: "width 0.3s",
+          "&:hover": {
+            width: "240px",
+          },
+        }}
+        onMouseEnter={() => setDrawerOpen(true)}
+        onMouseLeave={() => setDrawerOpen(false)}
+      >
+        <Box
+          sx={{
+            width: "240px",
+            height: "100%",
+            p: 2,
+            display: "flex",
+            flexDirection: "column",
+            opacity: drawerOpen ? 1 : 0,
+            transition: "opacity 0.3s",
+          }}
         >
-          {playAudio ? "TTS On" : "TTS Off"}
-        </button>
-        <button
-          className={`px-4 py-2 rounded ${
-            sendPhotos ? "bg-green-500" : "bg-red-500"
-          } text-white`}
-          onClick={toggleSendPhotos}
+          <Typography variant="h6" gutterBottom>
+            Controls
+          </Typography>
+          <Box sx={{ mt: 2 }}>
+            <Tooltip title={playAudio ? "TTS On" : "TTS Off"}>
+              <IconButton
+                onClick={toggleAudioOutput}
+                color={playAudio ? "primary" : "default"}
+              >
+                <Volume2 size={24} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip
+              title={sendPhotos ? "Sending images" : "Not sending images"}
+            >
+              <IconButton
+                onClick={toggleSendPhotos}
+                color={sendPhotos ? "primary" : "default"}
+              >
+                {/* Add an appropriate icon for sending photos */}
+              </IconButton>
+            </Tooltip>
+            <Tooltip title={sendAudio ? "Sending audio" : "Not sending audio"}>
+              <IconButton
+                onClick={toggleSendAudio}
+                color={sendAudio ? "primary" : "default"}
+              >
+                {/* Add an appropriate icon for sending audio */}
+              </IconButton>
+            </Tooltip>
+          </Box>
+          {clickResponses.length > 0 && (
+            <Typography sx={{ mt: 2 }}>
+              {"Responding as: " +
+                clickResponses[clickResponses.length - 1].text}
+            </Typography>
+          )}
+          <TextFeed responses={responses} />
+        </Box>
+      </Box>
+      <Tooltip title={isRecording ? "Stop Recording" : "Start Recording"}>
+        <IconButton
+          sx={{
+            position: "absolute",
+            bottom: 20,
+            right: 20,
+            backgroundColor: isRecording ? "green" : "blue",
+            color: "white",
+            "&:hover": {
+              backgroundColor: isRecording ? "darkgreen" : "darkblue",
+            },
+          }}
+          onClick={toggleRecording}
         >
-          {sendPhotos ? "Sending images" : "Not sending images"}
-        </button>
-        <button
-          className={`px-4 py-2 rounded ${
-            sendAudio ? "bg-green-500" : "bg-red-500"
-          } text-white`}
-          onClick={toggleSendAudio}
-        >
-          {sendAudio ? "Sending audio" : "Not sending audio"}
-        </button>
-      </div>
-      {clickResponses.length > 0 && (
-        <p className="message mb-2 p-2">
-          {"Responding as: " + clickResponses[clickResponses.length - 1].text}
-        </p>
-      )}
-      <AudioVisualizer />
-      <TextFeed responses={responses} />
-    </div>
+          <Mic size={24} />
+        </IconButton>
+      </Tooltip>
+    </Box>
   );
 }

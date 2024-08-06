@@ -64,11 +64,11 @@ const chat = model.startChat({
   history: [
     {
       role: "user",
-      parts: [{ text: SYSTEM_PROMPT }],
+      parts: [{ text: SYSTEM_PROMPT("water bottle") }],
     },
     {
       role: "model",
-      parts: [{ text: SYSTEM_PROMPT_RESPONSE }],
+      parts: [{ text: SYSTEM_PROMPT_RESPONSE("water bottle") }],
     },
   ],
   generationConfig: {

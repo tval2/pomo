@@ -1,12 +1,9 @@
-"use client";
-
 import { useRef, useState, useEffect, useCallback } from "react";
-
 import { InteractiveSegmenter, FilesetResolver } from "@mediapipe/tasks-vision";
 import cv from "@techstark/opencv-js";
 import useRequestAnimationFrame from "use-request-animation-frame";
-
 import { colorizeAndBlurMask } from "./shaders";
+import { Box } from "@mui/material";
 
 const SHOW_SCREENSHOT = false;
 const SCREENSHOT_ON_CLICK = true;
@@ -31,10 +28,12 @@ let criteria: any;
 // Image Segmentation
 let segmenter: InteractiveSegmenter;
 let hasSegmented = false;
-let clickPos: {
-  x: number;
-  y: number;
-} | undefined;
+let clickPos:
+  | {
+      x: number;
+      y: number;
+    }
+  | undefined;
 let clickTime: number;
 
 interface WebcamVideoProps {
@@ -102,8 +101,12 @@ export default function WebcamVideo(props: WebcamVideoProps) {
     }
 
     if (clickPosRef.current) {
-      clickPosRef.current.style.left = `${videoRef.current.offsetLeft + clickPos.x}px`;
-      clickPosRef.current.style.top = `${videoRef.current.offsetTop + clickPos.y}px`;
+      clickPosRef.current.style.left = `${
+        videoRef.current.offsetLeft + clickPos.x
+      }px`;
+      clickPosRef.current.style.top = `${
+        videoRef.current.offsetTop + clickPos.y
+      }px`;
     }
     videoRef.current.width = videoRef.current.videoWidth;
     videoRef.current.height = videoRef.current.videoHeight;
@@ -142,7 +145,10 @@ export default function WebcamVideo(props: WebcamVideoProps) {
 
         const maskData = mask.getAsUint8Array();
         let dt = new Date().getTime() / 1000 - clickTime;
-        let clickPosNorm = { x: (1.0 - segmentPos.x / width), y: (1.0 - segmentPos.y / height) };
+        let clickPosNorm = {
+          x: 1.0 - segmentPos.x / width,
+          y: 1.0 - segmentPos.y / height,
+        };
 
         colorizeAndBlurMask(ctx, width, height, maskData, dt, clickPosNorm);
       }
@@ -157,10 +163,18 @@ export default function WebcamVideo(props: WebcamVideoProps) {
       st = new cv.Mat();
       err = new cv.Mat();
       winSize = new cv.Size(15, 15);
-      criteria = new cv.TermCriteria(cv.TermCriteria_EPS | cv.TermCriteria_COUNT, 10, 0.03);
+      criteria = new cv.TermCriteria(
+        cv.TermCriteria_EPS | cv.TermCriteria_COUNT,
+        10,
+        0.03
+      );
 
       videoCapture = new cv.VideoCapture(videoRef.current);
-      frame = new cv.Mat(videoRef.current.videoHeight, videoRef.current.videoWidth, cv.CV_8UC4);
+      frame = new cv.Mat(
+        videoRef.current.videoHeight,
+        videoRef.current.videoWidth,
+        cv.CV_8UC4
+      );
       videoCapture.read(frame);
       cv.cvtColor(frame, oldGray, cv.COLOR_RGB2GRAY);
     } else {
@@ -172,11 +186,24 @@ export default function WebcamVideo(props: WebcamVideoProps) {
       p0.data32F[1] = clickPos.y;
 
       // calculate optical flow
-      cv.calcOpticalFlowPyrLK(oldGray, frameGray, p0, p1, st, err, winSize, maxLevel, criteria);
+      cv.calcOpticalFlowPyrLK(
+        oldGray,
+        frameGray,
+        p0,
+        p1,
+        st,
+        err,
+        winSize,
+        maxLevel,
+        criteria
+      );
 
       // did we get a good point?
       if (st.rows === 1 && st.data[0] === 1) {
-        clickPos = { x: videoRef.current.videoWidth - p1.data32F[0], y: p1.data32F[1] };
+        clickPos = {
+          x: videoRef.current.videoWidth - p1.data32F[0],
+          y: p1.data32F[1],
+        };
       } else {
         clickPos = undefined;
       }
@@ -238,16 +265,27 @@ export default function WebcamVideo(props: WebcamVideoProps) {
   }, [mediaStream]);
 
   return (
-    <div className="w-full h-full relative">
-      <div className="flex justify-center">
-        <video
-          className="w-fit h-full relative scale-x-[-1]"
-          ref={videoRef}
-          disablePictureInPicture
-          autoPlay
-          onClick={
-            SCREENSHOT_ON_CLICK
-              ? (event) => {
+    <Box
+      sx={{
+        width: "100%",
+        height: "100%",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <video
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          transform: "scaleX(-1)",
+        }}
+        ref={videoRef}
+        disablePictureInPicture
+        autoPlay
+        onClick={
+          SCREENSHOT_ON_CLICK
+            ? (event) => {
                 let rect = videoRef.current!.getBoundingClientRect();
                 let x = event.pageX - rect.left;
                 let y = event.clientY - rect.top;
@@ -260,22 +298,46 @@ export default function WebcamVideo(props: WebcamVideoProps) {
                 clickTime = new Date().getTime() / 1000;
                 clickPos = { x: x, y: y };
               }
-              : undefined
-          }
-        />
-        <canvas className={`absolute pointer-events-none ${clickPos ? "block" : "hidden"}`} ref={maskRef} />
-        {clickPos && videoRef.current && SHOW_CLICK_POS ?
-          <div
-            className="absolute bg-red-500 w-[10px] h-[10px] translate-x-[-50%] translate-y-[-50%]"
-            ref={clickPosRef}
-          />
-          : null
+            : undefined
         }
-      </div>
+      />
       <canvas
-        className={"h-full mx-auto " + (SHOW_SCREENSHOT ? "block" : "hidden")}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+          display: clickPos ? "block" : "none",
+        }}
+        ref={maskRef}
+      />
+      {clickPos && videoRef.current && SHOW_CLICK_POS ? (
+        <div
+          style={{
+            position: "absolute",
+            backgroundColor: "red",
+            width: "10px",
+            height: "10px",
+            transform: "translate(-50%, -50%)",
+            left: `${videoRef.current.offsetLeft + clickPos.x}px`,
+            top: `${videoRef.current.offsetTop + clickPos.y}px`,
+          }}
+          ref={clickPosRef}
+        />
+      ) : null}
+      <canvas
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          display: SHOW_SCREENSHOT ? "block" : "none",
+        }}
         ref={canvasRef}
       />
-    </div>
+    </Box>
   );
 }

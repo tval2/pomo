@@ -13,10 +13,13 @@ const ROLLING_BUFFER_SIZE = 32; // grab the previous 15 frames (or the previous 
 
 interface WebcamAudioProps {
   onNewData: (data: string) => void;
+  isRecording: boolean;
 }
 
-export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
-  const [isRecording, setIsRecording] = useState(false);
+export default function WebcamAudio({
+  onNewData,
+  isRecording,
+}: WebcamAudioProps) {
   const [voiceProbability, setVoiceProbability] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const engineRef = useRef<any>(null);
@@ -137,7 +140,6 @@ export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
       };
       engineRef.current = engine;
       await WebVoiceProcessor.subscribe(engine);
-      setIsRecording(true);
     } catch (error) {
       console.error("Failed to start recording:", error);
       alert(
@@ -151,15 +153,14 @@ export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
       await WebVoiceProcessor.unsubscribe(engineRef.current);
       engineRef.current = null;
     }
-    setIsRecording(false);
     sendAudioToLLM();
   }, [sendAudioToLLM]);
 
-  const toggleRecording = useCallback(() => {
+  useEffect(() => {
     if (isRecording) {
-      stopRecording();
-    } else {
       startRecording();
+    } else {
+      stopRecording();
     }
   }, [isRecording, startRecording, stopRecording]);
 
@@ -184,15 +185,8 @@ export default function WebcamAudio({ onNewData }: WebcamAudioProps) {
     }
   };
 
-  const buttonClasses = `py-2 px-4 text-base font-semibold rounded cursor-pointer transition-colors duration-300 ${
-    isRecording ? "bg-green-500" : "bg-red-500"
-  } text-white`;
-
   return (
     <div className="flex flex-col items-start space-y-4">
-      <button onClick={toggleRecording} className={buttonClasses}>
-        {isRecording ? "Stop Recording" : "Start Recording"}
-      </button>
       <div className="w-full max-w-md">{renderVoiceBar()}</div>
     </div>
   );
