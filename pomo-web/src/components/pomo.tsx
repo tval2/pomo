@@ -1,15 +1,19 @@
 "use client";
 
 import React, { useCallback, useState, useRef, useEffect } from "react";
-import { LLMData, callChat, callLLM } from "../utils/llm";
-import { setAudioEnabled } from "../utils/tts";
+import { LLMData, callChat, callLLM } from "@/utils/llm";
+import { setAudioEnabled } from "@/utils/tts";
+import { useAudioAnalyzer } from "../utils/audioContextManager";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
-import { AudioVisualizer } from "./audioviz";
-import { Box, Drawer, IconButton, Typography, Tooltip } from "@mui/material";
-import MenuIcon from "@mui/icons-material/Menu";
-import { Mic, Volume2 } from "lucide-react";
+import {
+  SpeakerIcon,
+  GradientMicButton,
+  AppHearingIcon,
+  PhotoIcon,
+} from "@/ui/icons";
+import { Box, Typography, Tooltip } from "@mui/material";
 
 interface Response {
   id: number;
@@ -38,6 +42,8 @@ export default function Pomo() {
   const sendPhotosRef = useRef(DEFAULT_SEND_PHOTOS);
   const sendAudioRef = useRef(DEFAULT_SEND_AUDIO);
   const recentImagesRef = useRef<string[]>([]);
+
+  const { volume } = useAudioAnalyzer();
 
   useEffect(() => {
     sendPhotosRef.current = sendPhotos;
@@ -162,8 +168,7 @@ export default function Pomo() {
           zIndex: 1000,
         }}
       >
-        <AudioVisualizer />
-        <WebcamAudio onNewData={handleNewAudio} isRecording />
+        <WebcamAudio onNewData={handleNewAudio} isRecording={isRecording} />
       </Box>
       <Box
         sx={{
@@ -172,7 +177,7 @@ export default function Pomo() {
           top: 0,
           bottom: 0,
           width: "48px",
-          backgroundColor: "rgba(0, 0, 255, 0.5)",
+          backgroundColor: "rgba(255, 255, 255, 0.8)",
           transition: "width 0.3s",
           "&:hover": {
             width: "240px",
@@ -195,33 +200,14 @@ export default function Pomo() {
           <Typography variant="h6" gutterBottom>
             Controls
           </Typography>
-          <Box sx={{ mt: 2 }}>
-            <Tooltip title={playAudio ? "TTS On" : "TTS Off"}>
-              <IconButton
-                onClick={toggleAudioOutput}
-                color={playAudio ? "primary" : "default"}
-              >
-                <Volume2 size={24} />
-              </IconButton>
-            </Tooltip>
-            <Tooltip
-              title={sendPhotos ? "Sending images" : "Not sending images"}
-            >
-              <IconButton
-                onClick={toggleSendPhotos}
-                color={sendPhotos ? "primary" : "default"}
-              >
-                {/* Add an appropriate icon for sending photos */}
-              </IconButton>
-            </Tooltip>
-            <Tooltip title={sendAudio ? "Sending audio" : "Not sending audio"}>
-              <IconButton
-                onClick={toggleSendAudio}
-                color={sendAudio ? "primary" : "default"}
-              >
-                {/* Add an appropriate icon for sending audio */}
-              </IconButton>
-            </Tooltip>
+          <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
+            <SpeakerIcon
+              isOn={playAudio}
+              volume={volume}
+              onClick={toggleAudioOutput}
+            />
+            <PhotoIcon isOn={sendPhotos} onClick={toggleSendPhotos} />
+            <AppHearingIcon isOn={sendAudio} onClick={toggleSendAudio} />
           </Box>
           {clickResponses.length > 0 && (
             <Typography sx={{ mt: 2 }}>
@@ -233,21 +219,10 @@ export default function Pomo() {
         </Box>
       </Box>
       <Tooltip title={isRecording ? "Stop Recording" : "Start Recording"}>
-        <IconButton
-          sx={{
-            position: "absolute",
-            bottom: 20,
-            right: 20,
-            backgroundColor: isRecording ? "green" : "blue",
-            color: "white",
-            "&:hover": {
-              backgroundColor: isRecording ? "darkgreen" : "darkblue",
-            },
-          }}
+        <GradientMicButton
           onClick={toggleRecording}
-        >
-          <Mic size={24} />
-        </IconButton>
+          isRecording={isRecording}
+        />
       </Tooltip>
     </Box>
   );

@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { stopAudio, isPlaying } from "../utils/tts";
+import { Box } from "@mui/material";
+import { stopAudio, isPlaying } from "@/utils/tts";
+import { log } from "@/utils/performance";
 import { WebVoiceProcessor } from "@picovoice/web-voice-processor";
 import { WaveFile } from "wavefile";
-import { log } from "../utils/performance";
-import { LinearProgressProcessing, LinearProgressWithLabel } from "../ui/audio";
+import { LinearProgressProcessing, LinearProgressWithLabel } from "@/ui/audio";
 
 // currently sampling at 16kHz (16,000 samples per second) @ frame rate of
 //  512 samples per frame, which is 31.25 frames per second (or 0.032 seconds per frame).
@@ -178,16 +179,15 @@ export default function WebcamAudio({
   const renderVoiceBar = () => {
     if (isProcessing) {
       return <LinearProgressProcessing />;
-    } else {
+    } else if (voiceProbability > 0) {
       return (
         <LinearProgressWithLabel value={Math.floor(voiceProbability * 100)} />
       );
     }
+    return null;
   };
 
   return (
-    <div className="flex flex-col items-start space-y-4">
-      <div className="w-full max-w-md">{renderVoiceBar()}</div>
-    </div>
+    <Box sx={{ width: "100%", maxWidth: "300px" }}>{renderVoiceBar()}</Box>
   );
 }
