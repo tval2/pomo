@@ -49,32 +49,35 @@ export default function WebcamVideo(props: WebcamVideoProps) {
   const maskRef = useRef<HTMLCanvasElement>(null);
   const clickPosRef = useRef<HTMLDivElement>(null);
 
-  const takeScreenshot = useCallback((maskData?: Uint8Array) => {
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    if (!canvas || !video) {
-      return undefined;
-    }
+  const takeScreenshot = useCallback(
+    (maskData?: Uint8Array) => {
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      if (!canvas || !video) {
+        return undefined;
+      }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    let canvasContext = canvas.getContext("2d")!;
-    canvasContext.scale(-1, 1);
-    canvasContext.drawImage(video, 0, 0, -canvas.width, canvas.height);
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      let canvasContext = canvas.getContext("2d")!;
+      canvasContext.scale(-1, 1);
+      canvasContext.drawImage(video, 0, 0, -canvas.width, canvas.height);
 
-    if (maskData) {
-      canvasContext.fillStyle = "black";
-      for (let y = 0; y < canvas.height; y++) {
-        for (let x = 0; x < canvas.width; x++) {
-          if (maskData[x + y * canvas.width] < 0.99 * 255) {
-            canvasContext.fillRect(-(canvas.width - x) + 1, y, -1, 1);
+      if (maskData) {
+        canvasContext.fillStyle = "black";
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            if (maskData[x + y * canvas.width] < 0.99 * 255) {
+              canvasContext.fillRect(-(canvas.width - x) + 1, y, -1, 1);
+            }
           }
         }
       }
-    }
 
-    return canvas.toDataURL("image/png");
-  }, [canvasRef]);
+      return canvas.toDataURL("image/png");
+    },
+    [canvasRef]
+  );
 
   const setupMediaStream = useCallback(async () => {
     try {
@@ -121,8 +124,12 @@ export default function WebcamVideo(props: WebcamVideoProps) {
     }
 
     if (clickPosRef.current) {
-      clickPosRef.current.style.left = `${videoRef.current.offsetLeft + clickPos.x}px`;
-      clickPosRef.current.style.top = `${videoRef.current.offsetTop + clickPos.y}px`;
+      clickPosRef.current.style.left = `${
+        videoRef.current.offsetLeft + clickPos.x
+      }px`;
+      clickPosRef.current.style.top = `${
+        videoRef.current.offsetTop + clickPos.y
+      }px`;
       if (SHOW_CLICK_POS) {
         clickPosRef.current.style.display = "block";
       }
@@ -321,18 +328,16 @@ export default function WebcamVideo(props: WebcamVideoProps) {
 
                 prevHadClicked = false;
               }
-              : undefined
-          }
-        />
-        <canvas className={`absolute pointer-events-none hidden`} ref={maskRef} />
-        {clickPos && videoRef.current && SHOW_CLICK_POS ?
-          <div
-            className="absolute bg-red-500 w-[10px] h-[10px] translate-x-[-50%] translate-y-[-50%]"
-            ref={clickPosRef}
-          />
-          : null
+            : undefined
         }
       />
+      <canvas className={`absolute pointer-events-none hidden`} ref={maskRef} />
+      {clickPos && videoRef.current && SHOW_CLICK_POS ? (
+        <div
+          className="absolute bg-red-500 w-[10px] h-[10px] translate-x-[-50%] translate-y-[-50%]"
+          ref={clickPosRef}
+        />
+      ) : null}
       <canvas
         style={{
           position: "absolute",
