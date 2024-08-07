@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-const API_ROUTES = ["chat", "tts", "llm", "vad"];
+const API_ROUTES = ["chat", "tts", "vad"];
 
 export default function WarmStart() {
   useEffect(() => {

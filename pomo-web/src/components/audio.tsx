@@ -98,7 +98,6 @@ export default function WebcamAudio({
         }
 
         if (voiceProbability > VAD_THRESHOLD) {
-          setIsProcessing(false);
           if (isPlaying) {
             stopAudio();
           }
@@ -188,6 +187,19 @@ export default function WebcamAudio({
   };
 
   return (
-    <Box sx={{ width: "100%", maxWidth: "300px" }}>{renderVoiceBar()}</Box>
+    <Box
+      sx={{
+        width: "300px",
+        position: "absolute",
+        bottom: 20,
+        left: "50%",
+        transform: "translateX(-50%)",
+        backgroundColor: "rgba(0, 0, 0, 0)",
+        padding: 0,
+        borderRadius: 1,
+      }}
+    >
+      {renderVoiceBar()}
+    </Box>
   );
 }

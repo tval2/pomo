@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useState, useRef, useEffect } from "react";
-import { LLMData, callChat, callLLM } from "@/utils/llm";
+import { LLMData, callChat } from "@/utils/llm";
 import { setAudioEnabled } from "@/utils/tts";
 import { useAudioAnalyzer } from "../utils/audioContextManager";
 import WebcamVideo from "./webcam";
@@ -13,7 +13,7 @@ import {
   AppHearingIcon,
   PhotoIcon,
 } from "@/ui/icons";
-import { Box, Typography, Tooltip } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 
 interface Response {
   id: number;
@@ -42,7 +42,6 @@ export default function Pomo() {
   const sendPhotosRef = useRef(DEFAULT_SEND_PHOTOS);
   const sendAudioRef = useRef(DEFAULT_SEND_AUDIO);
   const recentImagesRef = useRef<string[]>([]);
-  const selectedObjectRef = useRef<string>();
 
   const { volume } = useAudioAnalyzer();
 
@@ -76,16 +75,13 @@ export default function Pomo() {
         data.images = recentImagesRef.current;
       }
 
-      if (selectedObjectRef.current) {
-        data.text = selectedObjectRef.current;
-      }
-
       try {
         responseId.current = await callChat(
           data,
           responseId.current,
           setResponses,
-          playAudio
+          playAudio,
+          false // turn off object identification; make sure to use the chat feature
         );
 
         if (sendPhotosRef.current && recentImagesRef.current.length > 0) {
@@ -119,10 +115,12 @@ export default function Pomo() {
 
     setIsClickProcessing(true);
     try {
-      clickResponseId.current = await callLLM(
+      clickResponseId.current = await callChat(
         data,
         clickResponseId.current,
-        setClickResponses
+        setClickResponses,
+        false,
+        true // use object identification instead of chat
       );
     } catch (error) {
       console.error("Error processing click:", error);
@@ -149,12 +147,6 @@ export default function Pomo() {
     setIsRecording((prev) => !prev);
   }, []);
 
-  useEffect(() => {
-    if (clickResponses.length > 0) {
-      selectedObjectRef.current = clickResponses[clickResponses.length - 1].text;
-    }
-  }, [clickResponses]);
-
   return (
     <Box
       sx={{
@@ -170,17 +162,7 @@ export default function Pomo() {
           processClick(data);
         }}
       />
-      <Box
-        sx={{
-          position: "absolute",
-          bottom: 20,
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 1000,
-        }}
-      >
-        <WebcamAudio onNewData={handleNewAudio} isRecording={isRecording} />
-      </Box>
+      <WebcamAudio onNewData={handleNewAudio} isRecording={isRecording} />
       <Box
         sx={{
           position: "absolute",
@@ -229,12 +211,7 @@ export default function Pomo() {
           <TextFeed responses={responses} />
         </Box>
       </Box>
-      <Tooltip title={isRecording ? "Stop Recording" : "Start Recording"}>
-        <GradientMicButton
-          onClick={toggleRecording}
-          isRecording={isRecording}
-        />
-      </Tooltip>
+      <GradientMicButton onClick={toggleRecording} isRecording={isRecording} />
     </Box>
   );
 }

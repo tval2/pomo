@@ -7,10 +7,10 @@ import LinearProgress, {
 import Typography from "@mui/material/Typography";
 
 const GradientLinearProgress = styled(LinearProgress)(({ theme }) => ({
-  height: 10,
+  height: 20,
   borderRadius: 5,
   [`&.${linearProgressClasses.colorPrimary}`]: {
-    backgroundColor: "transparent",
+    backgroundColor: "rgba(0, 0, 0, 0)",
   },
   [`& .${linearProgressClasses.bar}`]: {
     borderRadius: 5,
@@ -19,10 +19,10 @@ const GradientLinearProgress = styled(LinearProgress)(({ theme }) => ({
 }));
 
 const GreenLinearProgress = styled(LinearProgress)(({ theme }) => ({
-  height: 10,
+  height: 20,
   borderRadius: 5,
   [`&.${linearProgressClasses.colorPrimary}`]: {
-    backgroundColor: "transparent",
+    backgroundColor: "rgba(0, 0, 0, 0)",
   },
   [`& .${linearProgressClasses.bar}`]: {
     borderRadius: 5,

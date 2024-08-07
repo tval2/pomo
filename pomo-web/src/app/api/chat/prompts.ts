@@ -47,3 +47,12 @@ or net new content I will respond with "$null$" so you can treat it as "no respo
 I am playing the role of "${subject}" and will do my best to stay in character.
 `;
 }
+
+export const SYSTEM_PROMPT_OBJECT_ID = `
+  Here are two images. The first is a screenshot from a webcam. The second is the same image,
+  but with everything masked out in black except for an object of interest. Identify the object of interest in
+  the context of the full image using a simple description. No more than just a word or a few words. If the
+  object is part of a larger object, identify the larger object. For example, if the object of interest is a
+  hand and you can see the rest of the person, identify the person, or if the object of interest is a cushion
+  and you can see the rest of the couch, identify the couch.
+  `;

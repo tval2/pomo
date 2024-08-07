@@ -10,22 +10,24 @@ export async function callChat(
   data: LLMData,
   responseId: number,
   setResponses: (responses: (prevResponses: Response[]) => Response[]) => void,
-  playAudio: boolean // Whether to play the audio out loud
+  playAudio: boolean = true, // Whether to play the audio out loud
+  object_identification: boolean = false // Whether to identify the object instead of chat
 ): Promise<number> {
   if (!data || (!data.images && !data.audio && !data.text)) {
     return responseId;
   }
 
   try {
-    log("calling Gemini API", "llm1");
+    log("calling Gemini Chat API", object_identification ? "_" : "llm1");
     const response = await fetch("/api/chat", {
       method: "POST",
       body: JSON.stringify(data),
       headers: {
         "Content-Type": "application/json",
+        "X-ObjectID": object_identification.toString(),
       },
     });
-    log("received Gemini API", "llm2");
+    log("received Gemini Chat API", object_identification ? "_" : "llm2");
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -38,6 +40,29 @@ export async function callChat(
       throw new Error("Response body is null");
     }
 
+    // If only used to ID the object then bypass stream generator
+    if (object_identification) {
+      let result = await response.json();
+      if (!result || !result.result) {
+        throw new Error("Response result is null");
+      }
+
+      setResponses((prevResponses: Response[]) => {
+        const lastResponse = prevResponses[prevResponses.length - 1];
+        if (lastResponse && lastResponse.id === responseId) {
+          return [
+            ...prevResponses.slice(0, -1),
+            { ...lastResponse, text: lastResponse.text + result.result },
+          ];
+        } else {
+          return [...prevResponses, { id: responseId, text: result.result }];
+        }
+      });
+
+      return responseId + 1;
+    }
+
+    // If using chat as normal then stream the response
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -78,60 +103,6 @@ export async function callChat(
     return responseId + 1;
   } catch (error) {
     console.error("Error calling chat API:", error);
-    return responseId;
-  }
-}
-
-export async function callLLM(
-  data: LLMData,
-  responseId: number,
-  setResponses: (responses: (prevResponses: Response[]) => Response[]) => void
-): Promise<number> {
-  if (!data || (!data.images && !data.audio && !data.text)) {
-    console.error("No data to send to callLLM");
-    return responseId;
-  }
-
-  try {
-    const response = await fetch("/api/llm", {
-      method: "POST",
-      body: JSON.stringify(data),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `HTTP error! status: ${response.status}, details: ${errorText}`
-      );
-    }
-
-    if (!response.body) {
-      throw new Error("Response body is null");
-    }
-
-    let result = await response.json();
-    if (!result || !result.result) {
-      throw new Error("Response result is null");
-    }
-
-    setResponses((prevResponses: Response[]) => {
-      const lastResponse = prevResponses[prevResponses.length - 1];
-      if (lastResponse && lastResponse.id === responseId) {
-        return [
-          ...prevResponses.slice(0, -1),
-          { ...lastResponse, text: lastResponse.text + result.result },
-        ];
-      } else {
-        return [...prevResponses, { id: responseId, text: result.result }];
-      }
-    });
-
-    return responseId + 1;
-  } catch (error) {
-    console.error("Error calling llm API:", error);
     return responseId;
   }
 }

@@ -15,11 +15,12 @@ interface SpeakerIconProps {
   onClick: () => void;
 }
 
+const INITIAL_ICON_SIZE = 30;
 const SpeakerIcon: React.FC<SpeakerIconProps> = ({ isOn, volume, onClick }) => {
-  const [iconSize, setIconSize] = useState(1);
+  const [iconSize, setIconSize] = useState(INITIAL_ICON_SIZE);
 
   useEffect(() => {
-    setIconSize(1 + volume / 100);
+    setIconSize(INITIAL_ICON_SIZE + volume / 100);
   }, [volume]);
 
   return (
@@ -34,7 +35,6 @@ const SpeakerIcon: React.FC<SpeakerIconProps> = ({ isOn, volume, onClick }) => {
             background: SELECTED_COLOR,
             transform: "scale(1.1)",
           },
-          transform: `scale(${iconSize})`,
         }}
       >
         <Volume2 />
@@ -102,24 +102,26 @@ const GradientMicButton: React.FC<GradientMicButtonProps> = ({
   onClick,
   isRecording,
 }) => (
-  <IconButton
-    sx={{
-      position: "absolute",
-      bottom: 20,
-      right: 20,
-      background: isRecording ? SELECTED_COLOR : UNSELECTED_COLOR,
-      color: "white",
-      border: isRecording ? "3px solid white" : "none",
-      transition: "all 0.3s ease",
-      "&:hover": {
-        background: SELECTED_COLOR,
-        transform: "scale(1.1)",
-      },
-    }}
-    onClick={onClick}
-  >
-    <MicNoneIcon sx={{ color: "white" }} />
-  </IconButton>
+  <Tooltip title={isRecording ? "Stop Recording" : "Start Recording"}>
+    <IconButton
+      sx={{
+        position: "absolute",
+        bottom: 20,
+        right: 20,
+        background: isRecording ? SELECTED_COLOR : UNSELECTED_COLOR,
+        color: "white",
+        border: isRecording ? "3px solid white" : "none",
+        transition: "all 0.3s ease",
+        "&:hover": {
+          background: SELECTED_COLOR,
+          transform: "scale(1.1)",
+        },
+      }}
+      onClick={onClick}
+    >
+      <MicNoneIcon sx={{ color: "white" }} />
+    </IconButton>
+  </Tooltip>
 );
 
 export { SpeakerIcon, AppHearingIcon, PhotoIcon, GradientMicButton };
