@@ -1,13 +1,19 @@
 "use client";
 
-import { useCallback, useState, useRef, useEffect } from "react";
-import { LLMData, callChat, callLLM } from "../utils/llm";
-import { setAudioEnabled } from "../utils/tts";
+import React, { useCallback, useState, useRef, useEffect } from "react";
+import { LLMData, callChat } from "@/utils/llm";
+import { setAudioEnabled } from "@/utils/tts";
+import { useAudioAnalyzer } from "../utils/audioContextManager";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
-import { AudioVisualizer } from "./audioviz";
-import { log } from "../utils/performance";
+import {
+  SpeakerIcon,
+  GradientMicButton,
+  AppHearingIcon,
+  PhotoIcon,
+} from "@/ui/icons";
+import { Box, Typography } from "@mui/material";
 
 interface Response {
   id: number;
@@ -26,6 +32,8 @@ export default function Pomo() {
   const [playAudio, setPlayAudio] = useState(DEFAULT_PLAY_AUDIO);
   const [sendPhotos, setSendPhotos] = useState(DEFAULT_SEND_PHOTOS);
   const [sendAudio, setSendAudio] = useState(DEFAULT_SEND_AUDIO);
+  const [isRecording, setIsRecording] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const responseId = useRef(0);
   const clickResponseId = useRef(0);
@@ -34,7 +42,8 @@ export default function Pomo() {
   const sendPhotosRef = useRef(DEFAULT_SEND_PHOTOS);
   const sendAudioRef = useRef(DEFAULT_SEND_AUDIO);
   const recentImagesRef = useRef<string[]>([]);
-  const selectedObjectRef = useRef<string>();
+
+  const { volume } = useAudioAnalyzer();
 
   useEffect(() => {
     sendPhotosRef.current = sendPhotos;
@@ -66,16 +75,13 @@ export default function Pomo() {
         data.images = recentImagesRef.current;
       }
 
-      if (selectedObjectRef.current) {
-        data.text = selectedObjectRef.current;
-      }
-
       try {
         responseId.current = await callChat(
           data,
           responseId.current,
           setResponses,
-          playAudio
+          playAudio,
+          false // turn off object identification; make sure to use the chat feature
         );
 
         if (sendPhotosRef.current && recentImagesRef.current.length > 0) {
@@ -109,10 +115,12 @@ export default function Pomo() {
 
     setIsClickProcessing(true);
     try {
-      clickResponseId.current = await callLLM(
+      clickResponseId.current = await callChat(
         data,
         clickResponseId.current,
-        setClickResponses
+        setClickResponses,
+        false,
+        true // use object identification instead of chat
       );
     } catch (error) {
       console.error("Error processing click:", error);
@@ -135,54 +143,75 @@ export default function Pomo() {
     setSendAudio((prev) => !prev);
   }, []);
 
-  useEffect(() => {
-    if (clickResponses.length > 0) {
-      selectedObjectRef.current = clickResponses[clickResponses.length - 1].text;
-    }
-  }, [clickResponses]);
+  const toggleRecording = useCallback(() => {
+    setIsRecording((prev) => !prev);
+  }, []);
 
   return (
-    <div className="w-full h-full relative p-4 space-y-4">
+    <Box
+      sx={{
+        width: "100vw",
+        height: "100vh",
+        overflow: "hidden",
+        position: "relative",
+      }}
+    >
       <WebcamVideo
         onNewData={handleNewImage}
         onClick={(data: string[]) => {
           processClick(data);
         }}
       />
-      <WebcamAudio onNewData={handleNewAudio} />
-      <div>
-        <button
-          className={`px-4 py-2 rounded ${
-            playAudio ? "bg-green-500" : "bg-red-500"
-          } text-white`}
-          onClick={toggleAudioOutput}
+      <WebcamAudio onNewData={handleNewAudio} isRecording={isRecording} />
+      <Box
+        sx={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: "48px",
+          backgroundColor: "rgba(255, 255, 255, 0.8)",
+          transition: "width 0.3s",
+          "&:hover": {
+            width: "240px",
+          },
+        }}
+        onMouseEnter={() => setDrawerOpen(true)}
+        onMouseLeave={() => setDrawerOpen(false)}
+      >
+        <Box
+          sx={{
+            width: "240px",
+            height: "100%",
+            p: 2,
+            display: "flex",
+            flexDirection: "column",
+            opacity: drawerOpen ? 1 : 0,
+            transition: "opacity 0.3s",
+          }}
         >
-          {playAudio ? "TTS On" : "TTS Off"}
-        </button>
-        <button
-          className={`px-4 py-2 rounded ${
-            sendPhotos ? "bg-green-500" : "bg-red-500"
-          } text-white`}
-          onClick={toggleSendPhotos}
-        >
-          {sendPhotos ? "Sending images" : "Not sending images"}
-        </button>
-        <button
-          className={`px-4 py-2 rounded ${
-            sendAudio ? "bg-green-500" : "bg-red-500"
-          } text-white`}
-          onClick={toggleSendAudio}
-        >
-          {sendAudio ? "Sending audio" : "Not sending audio"}
-        </button>
-      </div>
-      {clickResponses.length > 0 && (
-        <p className="message mb-2 p-2">
-          {"Responding as: " + clickResponses[clickResponses.length - 1].text}
-        </p>
-      )}
-      <AudioVisualizer />
-      <TextFeed responses={responses} />
-    </div>
+          <Typography variant="h6" gutterBottom>
+            Controls
+          </Typography>
+          <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
+            <SpeakerIcon
+              isOn={playAudio}
+              volume={volume}
+              onClick={toggleAudioOutput}
+            />
+            <PhotoIcon isOn={sendPhotos} onClick={toggleSendPhotos} />
+            <AppHearingIcon isOn={sendAudio} onClick={toggleSendAudio} />
+          </Box>
+          {clickResponses.length > 0 && (
+            <Typography sx={{ mt: 2 }}>
+              {"Responding as: " +
+                clickResponses[clickResponses.length - 1].text}
+            </Typography>
+          )}
+          <TextFeed responses={responses} />
+        </Box>
+      </Box>
+      <GradientMicButton onClick={toggleRecording} isRecording={isRecording} />
+    </Box>
   );
 }

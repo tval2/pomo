@@ -3,7 +3,11 @@ import {
   HarmCategory,
   HarmBlockThreshold,
 } from "@google/generative-ai";
-import { SYSTEM_PROMPT, SYSTEM_PROMPT_RESPONSE } from "./prompts";
+import {
+  SYSTEM_PROMPT,
+  SYSTEM_PROMPT_RESPONSE,
+  SYSTEM_PROMPT_OBJECT_ID,
+} from "./prompts";
 import { LLMData } from "@/utils/llm";
 
 const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
@@ -38,6 +42,29 @@ const safetySettings = [
   },
 ];
 
+const model = genAI.getGenerativeModel({
+  model: "gemini-1.5-flash-latest",
+  safetySettings: safetySettings,
+  generationConfig: generationConfig,
+});
+
+let chat = model.startChat({
+  history: [
+    {
+      role: "user",
+      parts: [{ text: SYSTEM_PROMPT("water bottle") }],
+    },
+    {
+      role: "model",
+      parts: [{ text: SYSTEM_PROMPT_RESPONSE("water bottle") }],
+    },
+  ],
+  generationConfig: {
+    maxOutputTokens: 100,
+  },
+});
+console.log("Chat started");
+
 function formatDataWithMime(type: string, data: string) {
   const mimeType64Match = type.match(/data:(.*?);base64/);
   const mimeTypeMatch = type.match(/data:(.*?)/);
@@ -53,29 +80,6 @@ function formatDataWithMime(type: string, data: string) {
     throw new Error("No MIME type found");
   }
 }
-
-const model = genAI.getGenerativeModel({
-  model: "gemini-1.5-flash-latest",
-  safetySettings: safetySettings,
-  generationConfig: generationConfig,
-});
-
-const chat = model.startChat({
-  history: [
-    {
-      role: "user",
-      parts: [{ text: SYSTEM_PROMPT }],
-    },
-    {
-      role: "model",
-      parts: [{ text: SYSTEM_PROMPT_RESPONSE }],
-    },
-  ],
-  generationConfig: {
-    maxOutputTokens: 100,
-  },
-});
-console.log("Chat started");
 
 function processDataUri(str: string) {
   const parts = str.split(",");
@@ -121,7 +125,7 @@ function configureLlmData(data: LLMData) {
   return messageData;
 }
 
-export async function sendMessage2LLM(data: LLMData) {
+export async function sendMessage2LLM(data: LLMData, object_id_flag: boolean) {
   if (!data) {
     throw new Error("No data provided in sendMessage2LLM");
   }
@@ -129,10 +133,38 @@ export async function sendMessage2LLM(data: LLMData) {
   const messageData = configureLlmData(data);
 
   try {
-    let lastLogTime = Date.now();
-    const result = await chat.sendMessageStream(messageData);
-    console.log(`[+${Date.now() - lastLogTime}ms] ${"raw Gemini call length"}`);
-    return result;
+    // use the regular chat interface
+    if (!object_id_flag) {
+      let lastLogTime = Date.now();
+      const result = await chat.sendMessageStream(messageData);
+      console.log(
+        `[+${Date.now() - lastLogTime}ms] ${"raw Gemini call length"}`
+      );
+      return result;
+    }
+
+    // otherwise, use the object detection
+    messageData.push({ text: SYSTEM_PROMPT_OBJECT_ID });
+    const result = await model.generateContent(messageData);
+    const response = result.response.text();
+
+    chat = model.startChat({
+      history: [
+        {
+          role: "user",
+          parts: [{ text: SYSTEM_PROMPT(response) }],
+        },
+        {
+          role: "model",
+          parts: [{ text: SYSTEM_PROMPT_RESPONSE(response) }],
+        },
+      ],
+      generationConfig: {
+        maxOutputTokens: 100,
+      },
+    });
+    console.log("Chat Restarted");
+    return response;
   } catch (error) {
     console.error("Error generating content:", error);
     throw error;
