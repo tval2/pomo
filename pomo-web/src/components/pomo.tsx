@@ -3,17 +3,18 @@
 import React, { useCallback, useState, useRef, useEffect } from "react";
 import { LLMData, callChat } from "@/utils/llm";
 import { setAudioEnabled } from "@/utils/tts";
-import { useAudioAnalyzer } from "../utils/audioContextManager";
+import { useAudioAnalyzer } from "@/utils/audioContextManager";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
+import VoiceSelector from "./voiceselector";
 import {
   SpeakerIcon,
   GradientMicButton,
   AppHearingIcon,
   PhotoIcon,
 } from "@/ui/icons";
-import { Box, Typography } from "@mui/material";
+import { Box, Typography, Divider } from "@mui/material";
 
 interface Response {
   id: number;
@@ -42,6 +43,8 @@ export default function Pomo() {
   const sendPhotosRef = useRef(DEFAULT_SEND_PHOTOS);
   const sendAudioRef = useRef(DEFAULT_SEND_AUDIO);
   const recentImagesRef = useRef<string[]>([]);
+
+  const drawerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { volume } = useAudioAnalyzer();
 
@@ -147,6 +150,19 @@ export default function Pomo() {
     setIsRecording((prev) => !prev);
   }, []);
 
+  const handleDrawerEnter = useCallback(() => {
+    if (drawerTimeoutRef.current) {
+      clearTimeout(drawerTimeoutRef.current);
+    }
+    setDrawerOpen(true);
+  }, []);
+
+  const handleDrawerLeave = useCallback(() => {
+    drawerTimeoutRef.current = setTimeout(() => {
+      setDrawerOpen(false);
+    }, 300);
+  }, []);
+
   return (
     <Box
       sx={{
@@ -169,46 +185,57 @@ export default function Pomo() {
           left: 0,
           top: 0,
           bottom: 0,
-          width: "48px",
+          width: drawerOpen ? "240px" : "48px",
           backgroundColor: "rgba(255, 255, 255, 0.8)",
           transition: "width 0.3s",
-          "&:hover": {
-            width: "240px",
-          },
         }}
-        onMouseEnter={() => setDrawerOpen(true)}
-        onMouseLeave={() => setDrawerOpen(false)}
+        onMouseEnter={handleDrawerEnter}
+        onMouseLeave={handleDrawerLeave}
       >
         <Box
           sx={{
             width: "240px",
             height: "100%",
-            p: 2,
             display: "flex",
             flexDirection: "column",
             opacity: drawerOpen ? 1 : 0,
             transition: "opacity 0.3s",
           }}
         >
-          <Typography variant="h6" gutterBottom>
-            Controls
-          </Typography>
-          <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
-            <SpeakerIcon
-              isOn={playAudio}
-              volume={volume}
-              onClick={toggleAudioOutput}
-            />
-            <PhotoIcon isOn={sendPhotos} onClick={toggleSendPhotos} />
-            <AppHearingIcon isOn={sendAudio} onClick={toggleSendAudio} />
-          </Box>
-          {clickResponses.length > 0 && (
-            <Typography sx={{ mt: 2 }}>
-              {"Responding as: " +
-                clickResponses[clickResponses.length - 1].text}
+          <Box sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Controls
             </Typography>
-          )}
-          <TextFeed responses={responses} />
+            <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
+              <SpeakerIcon
+                isOn={playAudio}
+                volume={volume}
+                onClick={toggleAudioOutput}
+              />
+              <PhotoIcon isOn={sendPhotos} onClick={toggleSendPhotos} />
+              <AppHearingIcon isOn={sendAudio} onClick={toggleSendAudio} />
+            </Box>
+          </Box>
+          <Divider />
+          <Box sx={{ flexGrow: 1, overflow: "auto", p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Agent
+            </Typography>
+            {clickResponses.length > 0 && (
+              <Typography sx={{ mt: 1 }}>
+                {"Responding as: " +
+                  clickResponses[clickResponses.length - 1].text}
+              </Typography>
+            )}
+            <Typography variant="h6" gutterBottom>
+              LLM Responses
+            </Typography>
+            <TextFeed responses={responses} />
+          </Box>
+          <Divider />
+          <Box sx={{ p: 2, maxHeight: "40%", overflow: "auto" }}>
+            <VoiceSelector />
+          </Box>
         </Box>
       </Box>
       <GradientMicButton onClick={toggleRecording} isRecording={isRecording} />

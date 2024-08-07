@@ -5,6 +5,8 @@ import {
   stopCurrentAudio,
 } from "./audioContextManager";
 import { log } from "./performance";
+import { getDefaultStore } from "jotai/vanilla";
+import { selectedVoiceIdAtom } from "@/atoms/voices";
 
 let audioEnabled = true;
 
@@ -151,6 +153,8 @@ export async function streamTTS(item: QueueItem): Promise<AudioBuffer> {
   }
 
   const audioCtx = getAudioContext();
+  const store = getDefaultStore();
+  const selectedVoiceId = store.get(selectedVoiceIdAtom);
 
   log("calling ElevenLabs API", "tts1");
   const response = await fetch("/api/tts", {
@@ -162,6 +166,7 @@ export async function streamTTS(item: QueueItem): Promise<AudioBuffer> {
       text: item.text,
       next_texts: item.nextTexts,
       index: item.index,
+      voice_id: selectedVoiceId,
     }),
   });
   log("received ElevenLabs API", "tts2");

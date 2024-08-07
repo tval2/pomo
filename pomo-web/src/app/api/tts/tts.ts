@@ -8,22 +8,21 @@ interface ResponseDictionary {
 }
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY4;
-const VOICE_ID = "CYw3kZ02Hs0563khs1Fj"; // Dave (https://elevenlabs.io/docs/voices/premade-voices);
+export const DEFAULT_VOICE_ID = "CYw3kZ02Hs0563khs1Fj"; // Dave (https://elevenlabs.io/docs/voices/premade-voices);
 const FIRST_INDEX_LATENCY = 1; // integer 0-4 (higher = faster but worse quality)
 
 if (!ELEVENLABS_API_KEY) {
   throw new Error("ELEVENLABS_API_KEY is not set in environment variables");
 }
 
-if (!VOICE_ID) {
-  throw new Error("ELEVENLABS_VOICE_ID is not set in environment variables");
-}
-
 const headers = {
   "xi-api-key": ELEVENLABS_API_KEY,
   "Content-Type": "application/json",
 };
-const url = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream`;
+
+function get_url(voice_id: string = DEFAULT_VOICE_ID): string {
+  return `https://api.elevenlabs.io/v1/text-to-speech/${voice_id}/stream`;
+}
 
 let previousResponses: ResponseDictionary = {};
 
@@ -54,7 +53,8 @@ function getLastThreeIds(index: number): { ids: string[]; texts: string[] } {
 export const createAudioStreamFromText = async (
   text: string,
   next_texts: string[],
-  index: number
+  index: number,
+  voice_id: string
 ): Promise<ReadableStream<Uint8Array>> => {
   if (!text) {
     throw new Error("No text provided in TTS call");
@@ -82,7 +82,7 @@ export const createAudioStreamFromText = async (
   }
 
   let lastLogTime = Date.now();
-  const response = await fetch(url, {
+  const response = await fetch(get_url(voice_id), {
     method: "POST",
     headers: headers,
     body: JSON.stringify(options),

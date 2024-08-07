@@ -1,10 +1,27 @@
 "use client";
 
 import { useEffect } from "react";
+import { useAtom } from "jotai";
+import { voicesAtom } from "@/atoms/voices";
 
 const API_ROUTES = ["chat", "tts", "vad"];
+const DAVE_DATA = {
+  name: "Dave",
+  voice_id: "CYw3kZ02Hs0563khs1Fj",
+  labels: {
+    description: "conversational",
+    gender: "male",
+    age: "young",
+    accent: "british-essex",
+    use_case: "video games",
+  },
+  preview_url:
+    "https://storage.googleapis.com/eleven-public-prod/premade/voices/CYw3kZ02Hs0563khs1Fj/872cb056-45d3-419e-b5c6-de2b387a93a0.mp3",
+};
 
 export default function WarmStart() {
+  const [, setVoices] = useAtom(voicesAtom);
+
   useEffect(() => {
     const warmUpAPI = async (route: string) => {
       try {
@@ -31,6 +48,24 @@ export default function WarmStart() {
 
     warmUpAllAPIs();
   }, []);
+
+  useEffect(() => {
+    async function fetchVoices() {
+      try {
+        const response = await fetch("/api/voices");
+        if (!response.ok) {
+          throw new Error("Failed to fetch voices");
+        }
+        const data = await response.json();
+
+        setVoices([...data, DAVE_DATA]);
+      } catch (error) {
+        console.error("Error fetching voices:", error);
+      }
+    }
+
+    fetchVoices();
+  }, [setVoices]);
 
   return null;
 }
