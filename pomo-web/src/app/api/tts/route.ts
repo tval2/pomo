@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAudioStreamFromText } from "./tts";
+import { createAudioStreamFromText, DEFAULT_VOICE_ID } from "./tts";
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: "ok" }, { status: 200 });
     }
 
-    const { text, next_texts, index } = await req.json();
+    const { text, next_texts, index, voice_id } = await req.json();
     if (!text) {
       return new Response(
         JSON.stringify({ message: "Text data provided in TTS api call" }),
@@ -18,7 +18,8 @@ export async function POST(req: NextRequest) {
     const audioStream = await createAudioStreamFromText(
       text,
       next_texts,
-      index
+      index,
+      voice_id ? voice_id : DEFAULT_VOICE_ID
     );
 
     const stream = new ReadableStream<Uint8Array>({

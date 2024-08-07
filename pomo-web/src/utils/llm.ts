@@ -35,11 +35,11 @@ export async function callChat(
         `HTTP error! status: ${response.status}, details: ${errorText}`
       );
     }
-
+    console.log("checkpoint ", 1);
     if (!response.body) {
       throw new Error("Response body is null");
     }
-
+    console.log("checkpoint ", 2);
     // If only used to ID the object then bypass stream generator
     if (object_identification) {
       let result = await response.json();
@@ -69,8 +69,12 @@ export async function callChat(
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
-
+      console.log("checkpoint ", 3);
+      if (done) {
+        console.log("EXITTING ", 0);
+        break;
+      }
+      console.log("checkpoint ", 4);
       const chunk = decoder.decode(value);
       const processedChunk = processChunk(chunk);
 
