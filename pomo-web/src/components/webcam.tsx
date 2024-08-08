@@ -20,6 +20,8 @@ let videoCapture: any;
 let frame: any;
 let frameGray: any;
 let oldGray: any;
+let originalClickedFrameGray: any;
+let originalClickPos: any;
 let p0: any;
 let p1: any;
 let st: any;
@@ -110,83 +112,89 @@ export default function WebcamVideo(props: WebcamVideoProps) {
   };
 
   const onFrame = useCallback(() => {
-    if (!segmenter || !videoRef.current || !clickPos) {
+    if (!segmenter || !videoRef.current || !(videoRef.current.videoWidth > 0) || !(videoRef.current.videoHeight > 0)) {
+      prevHadClicked = false;
+      return;
+    }
+
+    if (clickPos) {
+      if (clickPosRef.current) {
+        clickPosRef.current.style.left = `${videoRef.current.offsetLeft + clickPos.x}px`;
+        clickPosRef.current.style.top = `${videoRef.current.offsetTop + clickPos.y}px`;
+        if (SHOW_CLICK_POS) {
+          clickPosRef.current.style.display = "block";
+        }
+      }
+    } else {
       if (maskRef.current) {
         maskRef.current.style.display = "none";
       }
       if (clickPosRef.current) {
         clickPosRef.current.style.display = "none";
       }
-      prevHadClicked = false;
-      return;
-    }
-
-    if (clickPosRef.current) {
-      clickPosRef.current.style.left = `${videoRef.current.offsetLeft + clickPos.x}px`;
-      clickPosRef.current.style.top = `${videoRef.current.offsetTop + clickPos.y}px`;
-      if (SHOW_CLICK_POS) {
-        clickPosRef.current.style.display = "block";
-      }
     }
     videoRef.current.width = videoRef.current.videoWidth;
     videoRef.current.height = videoRef.current.videoHeight;
 
     // Segment
-    let segmentPos = clickPos;
-    let segmentPrevHadClicked = prevHadClicked;
-    segmenter.segment(
-      videoRef.current,
-      {
-        keypoint: {
-          x: 1.0 - segmentPos.x / videoRef.current.videoWidth,
-          y: segmentPos.y / videoRef.current.videoHeight,
+    if (clickPos) {
+      let segmentPos = clickPos;
+      let segmentPrevHadClicked = prevHadClicked;
+      segmenter.segment(
+        videoRef.current,
+        {
+          keypoint: {
+            x: 1.0 - segmentPos.x / videoRef.current.videoWidth,
+            y: segmentPos.y / videoRef.current.videoHeight,
+          },
         },
-      },
-      (result) => {
-        // The model takes a few seconds to initialize the first time
-        // When we get our first successful result, treat that as the clickTime
-        // so we don't see a flash
-        if (!hasSegmented) {
-          clickTime = new Date().getTime() / 1000;
-          hasSegmented = true;
-        }
-
-        const mask = result.confidenceMasks![0]!;
-        const canvas = maskRef.current;
-        if (!mask || !canvas) {
-          return;
-        }
-
-        const width = mask.width;
-        const height = mask.height;
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext("webgl2")!;
-
-        const maskData = mask.getAsUint8Array();
-
-        if (!segmentPrevHadClicked) {
-          let img = takeScreenshot();
-          let maskImg = takeScreenshot(maskData);
-          if (img && maskImg) {
-            props.onClick([img, maskImg]);
+        (result) => {
+          // The model takes a few seconds to initialize the first time
+          // When we get our first successful result, treat that as the clickTime
+          // so we don't see a flash
+          if (!hasSegmented) {
+            clickTime = new Date().getTime() / 1000;
+            hasSegmented = true;
           }
+
+          const mask = result.confidenceMasks![0]!;
+          const canvas = maskRef.current;
+          if (!mask || !canvas) {
+            return;
+          }
+
+          const width = mask.width;
+          const height = mask.height;
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext("webgl2")!;
+
+          const maskData = mask.getAsUint8Array();
+
+          if (!segmentPrevHadClicked) {
+            let img = takeScreenshot();
+            let maskImg = takeScreenshot(maskData);
+            if (img && maskImg) {
+              props.onClick([img, maskImg]);
+            }
+          }
+
+          let dt = new Date().getTime() / 1000 - clickTime;
+          let clickPosNorm = { x: (1.0 - segmentPos.x / width), y: (1.0 - segmentPos.y / height) };
+
+          colorizeAndBlurMask(ctx, width, height, maskData, dt, clickPosNorm);
+          maskRef.current.style.display = "block";
         }
-
-        let dt = new Date().getTime() / 1000 - clickTime;
-        let clickPosNorm = { x: (1.0 - segmentPos.x / width), y: (1.0 - segmentPos.y / height) };
-
-        colorizeAndBlurMask(ctx, width, height, maskData, dt, clickPosNorm);
-        maskRef.current.style.display = "block";
-      }
-    );
+      );
+    }
 
     // Optical Flow
     if (!videoCapture) {
       frameGray = new cv.Mat();
       oldGray = new cv.Mat();
       p0 = new cv.Mat(1, 1, cv.CV_32FC2);
+      originalClickPos = new cv.Mat(1, 1, cv.CV_32FC2);
       p1 = new cv.Mat();
       st = new cv.Mat();
       err = new cv.Mat();
@@ -202,11 +210,24 @@ export default function WebcamVideo(props: WebcamVideoProps) {
       videoCapture.read(frame);
       cv.cvtColor(frame, frameGray, cv.COLOR_RGBA2GRAY);
 
-      p0.data32F[0] = videoRef.current.videoWidth - clickPos.x;
-      p0.data32F[1] = clickPos.y;
+      if (clickPos) {
+        p0.data32F[0] = videoRef.current.videoWidth - clickPos.x;
+        p0.data32F[1] = clickPos.y;
+      }
+
+      if (!originalClickedFrameGray && clickPos) {
+        originalClickedFrameGray = new cv.Mat();
+        frameGray.copyTo(originalClickedFrameGray);
+        originalClickPos.data32F[0] = p0.data32F[0];
+        originalClickPos.data32F[1] = p0.data32F[1];
+      }
 
       // calculate optical flow
-      cv.calcOpticalFlowPyrLK(oldGray, frameGray, p0, p1, st, err, winSize, maxLevel, criteria);
+      if (clickPos) {
+        cv.calcOpticalFlowPyrLK(oldGray, frameGray, p0, p1, st, err, winSize, maxLevel, criteria);
+      } else if (originalClickedFrameGray) {
+        cv.calcOpticalFlowPyrLK(originalClickedFrameGray, frameGray, originalClickPos, p1, st, err, winSize, maxLevel, criteria);
+      }
 
       // did we get a good point?
       if (st.rows === 1 && st.data[0] === 1) {
@@ -219,7 +240,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
       frameGray.copyTo(oldGray);
     }
 
-    prevHadClicked = true;
+    prevHadClicked = clickPos !== undefined;
   }, [props, takeScreenshot]);
 
   useRequestAnimationFrame(onFrame, {});
@@ -286,6 +307,10 @@ export default function WebcamVideo(props: WebcamVideoProps) {
                 clickTime = new Date().getTime() / 1000;
 
                 prevHadClicked = false;
+                if (originalClickedFrameGray) {
+                  originalClickedFrameGray.delete();
+                  originalClickedFrameGray = undefined;
+                }
               }
               : undefined
           }
