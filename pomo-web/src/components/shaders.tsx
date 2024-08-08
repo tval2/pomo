@@ -127,7 +127,7 @@ void main(void){
   alpha *= MAX_ALPHA;
 
   float noiseVal = noise(SCALE * uv, SCALE_TIME * 2.0 * M_PI * time);
-  alpha *= clamp(1.0 - length(clickPos - uv) / (2.5 * dt) + noiseVal, 0.0, 1.0);
+  alpha *= clamp(1.0 - length(clickPos - uv) / (1.0 * (dt - 0.5)) + noiseVal, 0.0, 1.0);
 
   vec3 color = mix(COLOR1, COLOR2, noiseVal);
 
