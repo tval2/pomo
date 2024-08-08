@@ -4,6 +4,7 @@ import cv from "@techstark/opencv-js";
 import useRequestAnimationFrame from "use-request-animation-frame";
 import { colorizeAndBlurMask } from "./shaders";
 import { Box } from "@mui/material";
+import { useAudioAnalyzer } from "@/utils/audioContextManager";
 
 const SHOW_SCREENSHOT = false;
 const SCREENSHOT_ON_CLICK = true;
@@ -48,6 +49,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const maskRef = useRef<HTMLCanvasElement>(null);
   const clickPosRef = useRef<HTMLDivElement>(null);
+  const { volume } = useAudioAnalyzer();
 
   const takeScreenshot = useCallback(
     (maskData?: Uint8Array) => {
@@ -230,7 +232,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
           y: 1.0 - segmentPos.y / height,
         };
 
-        colorizeAndBlurMask(ctx, width, height, maskData, dt, clickPosNorm);
+        colorizeAndBlurMask(ctx, width, height, maskData, dt, volume, clickPosNorm);
         maskRef.current.style.display = "block";
       }
     );

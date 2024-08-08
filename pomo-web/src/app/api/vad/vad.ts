@@ -21,7 +21,8 @@ async function initializeCobra() {
   );
 
   if (platform === "win32") {
-    libraryPath = path.join(libraryPath, "windows", arch, "pv_cobra.dll");
+    // libraryPath = path.join(libraryPath, "windows", arch, "pv_cobra.dll");
+    libraryPath = path.join(libraryPath, "windows", "amd64", "pv_cobra.node");
   } else if (platform === "darwin") {
     libraryPath = path.join(libraryPath, "mac", arch, "pv_cobra.node");
   } else if (platform === "linux") {
