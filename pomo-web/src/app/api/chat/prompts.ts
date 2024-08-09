@@ -10,6 +10,7 @@ the role given to you and converse with the user in a fun yet believable way (th
 not feel overly formal nor forced / fake). You can simply answer the user, ask questions, demand 
 things, make jokes, try to sway their opinion on something - literally nothing is off limits. 
 If you have nothing to say just write "$null$" to indicate you aren't responding to the recent message. 
+Also if the user asks you to stop talking you probably should listen and just respond with "$null$". 
 
 Let's go through some examples:
 
@@ -56,3 +57,7 @@ export const SYSTEM_PROMPT_OBJECT_ID = `
   hand and you can see the rest of the person, identify the person, or if the object of interest is a cushion
   and you can see the rest of the couch, identify the couch.
   `;
+
+export const DEFAULT_AGENT_ROLE = `
+<the user hasn't selected any object or thing yet; 
+in this default case jsut assume the role of a generic assistant >`;

@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Box } from "@mui/material";
-import { stopAudio, isPlaying } from "@/utils/tts";
+import { stopAudio } from "@/utils/tts";
 import { log } from "@/utils/performance";
 import { WebVoiceProcessor } from "@picovoice/web-voice-processor";
 import { WaveFile } from "wavefile";
 import { LinearProgressProcessing, LinearProgressWithLabel } from "@/ui/audio";
+import { useAtomValue, useAtom } from "jotai";
+import { isPlayingAtom, isProcessingAtom } from "@/atoms/processes";
 
 // currently sampling at 16kHz (16,000 samples per second) @ frame rate of
 //  512 samples per frame, which is 31.25 frames per second (or 0.032 seconds per frame).
@@ -22,7 +24,6 @@ export default function WebcamAudio({
   isRecording,
 }: WebcamAudioProps) {
   const [voiceProbability, setVoiceProbability] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
   const engineRef = useRef<any>(null);
   const audioChunksRef = useRef<Int16Array[]>([]);
   const rollingBufferRef = useRef<Int16Array[]>([]);
@@ -30,15 +31,28 @@ export default function WebcamAudio({
   const sendAudioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const isPlaying = useAtomValue(isPlayingAtom);
+  const [isProcessing, setIsProcessing] = useAtom(isProcessingAtom);
+  const isPlayingRef = useRef(isPlaying);
+
+  useEffect(() => {
+    console.log("WebcamAudio rendered, isPlaying:", isPlaying);
+  });
+
   useEffect(() => {
     audioRef.current = new Audio("/sendAudio.mp3");
   }, []);
 
   useEffect(() => {
+    console.log("isPlaying changed:", isPlaying);
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  useEffect(() => {
     if (isPlaying) {
       setIsProcessing(false);
     }
-  }, [isPlaying]);
+  }, [isPlaying, setIsProcessing]);
 
   function convertPCMToWav(pcmData: Int16Array, sampleRate = 16000) {
     const wav = new WaveFile();
@@ -98,7 +112,8 @@ export default function WebcamAudio({
         }
 
         if (voiceProbability > VAD_THRESHOLD) {
-          if (isPlaying) {
+          console.log("vp:", voiceProbability, "isP", isPlayingRef.current);
+          if (isPlayingRef.current) {
             stopAudio();
           }
 

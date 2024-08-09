@@ -46,8 +46,6 @@ export default function Pomo() {
 
   const drawerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { volume } = useAudioAnalyzer();
-
   useEffect(() => {
     sendPhotosRef.current = sendPhotos;
   }, [sendPhotos]);
@@ -207,11 +205,7 @@ export default function Pomo() {
               Controls
             </Typography>
             <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
-              <SpeakerIcon
-                isOn={playAudio}
-                volume={volume}
-                onClick={toggleAudioOutput}
-              />
+              <SpeakerIcon isOn={playAudio} onClick={toggleAudioOutput} />
               <PhotoIcon isOn={sendPhotos} onClick={toggleSendPhotos} />
               <AppHearingIcon isOn={sendAudio} onClick={toggleSendAudio} />
             </Box>

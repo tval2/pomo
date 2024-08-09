@@ -82,7 +82,12 @@ export default function WebcamVideo(props: WebcamVideoProps) {
   const setupMediaStream = useCallback(async () => {
     try {
       const ms = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
+        video: {
+          facingMode: "user",
+          width: { ideal: 3840 },
+          height: { ideal: 2160 },
+          aspectRatio: 16 / 9,
+        },
         audio: false,
       });
       setMediaStream(ms);
