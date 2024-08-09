@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback } from "react";
 
 let audioContext: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
@@ -37,7 +37,7 @@ export function stopCurrentAudio(): void {
 }
 
 export function useAudioAnalyzer() {
-  const [volume, setVolume] = useState<number>(0);
+  const volume = useRef<number>(0);
 
   const updateVolume = useCallback(() => {
     const analyserNode = getAnalyser();
@@ -46,8 +46,8 @@ export function useAudioAnalyzer() {
     const average =
       dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
     const newVolume = average / 255;
-    setVolume(newVolume);
-  }, []);
+    volume.current = newVolume;
+  }, [volume]);
 
   useEffect(() => {
     const intervalId = setInterval(updateVolume, 100);
