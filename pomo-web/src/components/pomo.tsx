@@ -203,13 +203,13 @@ export default function Pomo() {
           }}
         >
           <Box sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
               Controls
             </Typography>
             <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
               <SpeakerIcon
                 isOn={playAudio}
-                volume={volume}
+                volume={volume.current}
                 onClick={toggleAudioOutput}
               />
               <PhotoIcon isOn={sendPhotos} onClick={toggleSendPhotos} />
@@ -218,16 +218,16 @@ export default function Pomo() {
           </Box>
           <Divider />
           <Box sx={{ flexGrow: 1, overflow: "auto", p: 2 }}>
-            <Typography variant="h6" gutterBottom>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
               Agent
             </Typography>
             {clickResponses.length > 0 && (
-              <Typography sx={{ mt: 1 }}>
+              <Typography sx={{ mt: 1 }} color="text.secondary">
                 {"Responding as: " +
                   clickResponses[clickResponses.length - 1].text}
               </Typography>
             )}
-            <Typography variant="h6" gutterBottom>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
               LLM Responses
             </Typography>
             <TextFeed responses={responses} />

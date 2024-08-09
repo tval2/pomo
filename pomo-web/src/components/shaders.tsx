@@ -142,7 +142,7 @@ void main(void){
     if (!isEdge) {
       alpha *= 1.0 - clamp(1.0 - radius / fadeTime + noiseVal, 0.0, 1.0);
     } else if (alpha > 0.0001) {
-      alpha += noiseVal * volume * MAX_ALPHA * smoothstep(fadeTime, 0.0, 0.5);
+      alpha += volume * MAX_ALPHA * smoothstep(fadeTime, 0.0, 0.5);
     }
   }
 
@@ -269,7 +269,9 @@ export const colorizeAndBlurMask = (ctx: WebGL2RenderingContext, width: number, 
   ctx.uniform1f(timeLocation, new Date().getTime() / 1000 - initTime);
   ctx.uniform1f(dtLocation, dt);
   ctx.uniform2fv(clickPosLocation, [clickPosNorm.x, clickPosNorm.y]);
-  ctx.uniform1f(volumeLocation, volume);
+  // Volume seems to max out around 0.3
+  const MAX_VOLUME = 0.3;
+  ctx.uniform1f(volumeLocation, Math.max(Math.min(volume / MAX_VOLUME, 1.0), 0.0));
   ctx.drawArrays(ctx.TRIANGLE_FAN, 0, 4);
 
   // Vertical blur back into the canvas

@@ -232,7 +232,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
           y: 1.0 - segmentPos.y / height,
         };
 
-        colorizeAndBlurMask(ctx, width, height, maskData, dt, volume, clickPosNorm);
+        colorizeAndBlurMask(ctx, width, height, maskData, dt, volume.current, clickPosNorm);
         maskRef.current.style.display = "block";
       }
     );

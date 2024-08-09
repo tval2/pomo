@@ -17,7 +17,7 @@ export default function TextFeed(props: TextFeedProps) {
           .filter((el) => el.text !== "")
           .toReversed()
           .map((response) => (
-            <p key={response.id} className="message">
+            <p key={response.id} className="message text-black">
               {response.text}
             </p>
           ))}
