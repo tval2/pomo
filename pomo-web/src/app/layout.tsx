@@ -3,7 +3,8 @@ import { Inter } from "next/font/google";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v13-appRouter";
 import "./globals.css";
 import { Provider } from "jotai";
-import { store } from "@/store";
+import { getStore } from "@/store";
+import { useRef } from "react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,10 +18,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const storeRef = useRef<any>();
+  if (!storeRef.current) {
+    storeRef.current = getStore();
+  }
+
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Provider store={store}>
+        <Provider store={storeRef.current}>
           <AppRouterCacheProvider>{children}</AppRouterCacheProvider>
         </Provider>
       </body>

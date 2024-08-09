@@ -6,7 +6,9 @@ import { WebVoiceProcessor } from "@picovoice/web-voice-processor";
 import { WaveFile } from "wavefile";
 import { LinearProgressProcessing, LinearProgressWithLabel } from "@/ui/audio";
 import { useAtomValue, useAtom } from "jotai";
-import { isPlayingAtom, isProcessingAtom } from "@/atoms/processes";
+import { getStore, isPlayingAtom, isProcessingAtom } from "@/store";
+
+const store = getStore();
 
 // currently sampling at 16kHz (16,000 samples per second) @ frame rate of
 //  512 samples per frame, which is 31.25 frames per second (or 0.032 seconds per frame).

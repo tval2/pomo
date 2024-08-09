@@ -5,11 +5,12 @@ import {
   stopCurrentAudio,
 } from "./audioContextManager";
 import { log } from "./performance";
-import { store } from "@/store";
-import { isPlayingAtom } from "@/atoms/processes";
+import { getStore, isPlayingAtom } from "@/store";
 import { selectedVoiceIdAtom } from "@/atoms/voices";
 
 let audioEnabled = true;
+
+const store = getStore();
 
 interface QueueItem {
   text: string;

@@ -1,13 +1,12 @@
 import { queueAudioText } from "./tts";
 import { isEndOfSentence, processChunk } from "./helpers";
 import { log } from "./performance";
-import { getDefaultStore } from "jotai/vanilla";
-import { isProcessingAtom } from "@/atoms/processes";
+import { getStore, isProcessingAtom } from "@/store";
 
 type Response = { id: number; text: string };
 export type LLMData = { audio?: string; images?: string[]; text?: string };
 
-const store = getDefaultStore();
+const store = getStore();
 
 export async function callChat(
   data: LLMData,
