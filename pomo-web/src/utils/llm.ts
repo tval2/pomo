@@ -1,12 +1,10 @@
 import { queueAudioText } from "./tts";
 import { isEndOfSentence, processChunk } from "./helpers";
 import { log } from "./performance";
-import { getStore, isProcessingAtom } from "@/store";
 
 type Response = { id: number; text: string };
-export type LLMData = { audio?: string; images?: string[]; text?: string };
 
-const store = getStore();
+export type LLMData = { audio?: string; images?: string[]; text?: string };
 
 export async function callChat(
   data: LLMData,
@@ -86,17 +84,14 @@ export async function callChat(
 
     while (true) {
       const { done, value } = await reader.read();
-      console.log("Processing chunk", done, "(", value?.length, ")");
       if (done) {
         if (!cumulativeText.trim()) {
           console.log("# EXITING with no text");
-          store.set(isProcessingAtom, false);
         }
         break;
       }
 
       const chunk = decoder.decode(value);
-      console.log("Chunk:", chunk);
       cumulativeText += chunk;
       const processedChunk = processChunk(chunk);
 
@@ -129,7 +124,6 @@ export async function callChat(
     return responseId + 1;
   } catch (error) {
     console.error("Error calling chat API:", error);
-    store.set(isProcessingAtom, false);
     return responseId;
   }
 }
