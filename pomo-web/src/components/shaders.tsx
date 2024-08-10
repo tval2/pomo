@@ -41,6 +41,7 @@ uniform sampler2D sampler0;
 uniform float time;
 uniform float dt;
 uniform vec2 clickPos;
+uniform float volume;
 
 in vec2 uv;
 
@@ -123,11 +124,27 @@ void main(void){
     alpha += GAUSSIAN_KERNEL[i] * newAlpha;
 	}
 
+  bool isEdge = alpha < 0.9999;
   const float MAX_ALPHA = 0.25;
   alpha *= MAX_ALPHA;
 
   float noiseVal = noise(SCALE * uv, SCALE_TIME * 2.0 * M_PI * time);
-  alpha *= clamp(1.0 - length(clickPos - uv) / (2.5 * dt) + noiseVal, 0.0, 1.0);
+  float radius = length(clickPos - uv);
+  float growTime = 1.5 * (dt - 0.5);
+  if (growTime < 0.000001) {
+    alpha = 0.0;
+  } else {
+    alpha *= clamp(1.0 - radius / growTime + noiseVal, 0.0, 1.0);
+  }
+
+  float fadeTime = 1.5 * (dt - 1.0);
+  if (fadeTime > 0.000001) {
+    if (!isEdge) {
+      alpha *= 1.0 - clamp(1.0 - radius / fadeTime + noiseVal, 0.0, 1.0);
+    } else if (alpha > 0.0001) {
+      alpha += volume * MAX_ALPHA * smoothstep(fadeTime, 0.0, 0.5);
+    }
+  }
 
   vec3 color = mix(COLOR1, COLOR2, noiseVal);
 
@@ -139,6 +156,7 @@ let colorAndHorizontalBlurProgram: WebGLProgram;
 let timeLocation: WebGLUniformLocation;
 let dtLocation: WebGLUniformLocation;
 let clickPosLocation: WebGLUniformLocation;
+let volumeLocation: WebGLUniformLocation;
 let maskTexture: WebGLTexture;
 let blurTexture: WebGLTexture;
 let blurFB: WebGLFramebuffer;
@@ -206,7 +224,7 @@ const initProgram = (ctx: WebGL2RenderingContext, vertexSrc: string, fragmentSrc
   return program;
 };
 
-export const colorizeAndBlurMask = (ctx: WebGL2RenderingContext, width: number, height: number, maskData: Uint8Array, dt: number, clickPosNorm: { x: number, y: number }) => {
+export const colorizeAndBlurMask = (ctx: WebGL2RenderingContext, width: number, height: number, maskData: Uint8Array, dt: number, volume: number, clickPosNorm: { x: number, y: number }) => {
   // Initialize programs
   if (!colorAndHorizontalBlurProgram) {
     maskTexture = initTexture(ctx);
@@ -224,6 +242,7 @@ export const colorizeAndBlurMask = (ctx: WebGL2RenderingContext, width: number, 
       timeLocation = ctx.getUniformLocation(colorAndHorizontalBlurProgram, "time")!;
       dtLocation = ctx.getUniformLocation(colorAndHorizontalBlurProgram, "dt")!;
       clickPosLocation = ctx.getUniformLocation(colorAndHorizontalBlurProgram, "clickPos")!;
+      volumeLocation = ctx.getUniformLocation(colorAndHorizontalBlurProgram, "volume")!;
     }
 
     // Pass 2
@@ -250,6 +269,9 @@ export const colorizeAndBlurMask = (ctx: WebGL2RenderingContext, width: number, 
   ctx.uniform1f(timeLocation, new Date().getTime() / 1000 - initTime);
   ctx.uniform1f(dtLocation, dt);
   ctx.uniform2fv(clickPosLocation, [clickPosNorm.x, clickPosNorm.y]);
+  // Volume seems to max out around 0.3
+  const MAX_VOLUME = 0.3;
+  ctx.uniform1f(volumeLocation, Math.max(Math.min(volume / MAX_VOLUME, 1.0), 0.0));
   ctx.drawArrays(ctx.TRIANGLE_FAN, 0, 4);
 
   // Vertical blur back into the canvas

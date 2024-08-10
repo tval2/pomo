@@ -4,6 +4,7 @@ import cv from "@techstark/opencv-js";
 import useRequestAnimationFrame from "use-request-animation-frame";
 import { colorizeAndBlurMask } from "./shaders";
 import { Box } from "@mui/material";
+import { useAudioAnalyzer } from "@/utils/audioContextManager";
 
 const SHOW_SCREENSHOT = false;
 const SCREENSHOT_ON_CLICK = true;
@@ -48,6 +49,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const maskRef = useRef<HTMLCanvasElement>(null);
   const clickPosRef = useRef<HTMLDivElement>(null);
+  const { volume } = useAudioAnalyzer();
 
   const takeScreenshot = useCallback(
     (maskData?: Uint8Array) => {
@@ -117,7 +119,57 @@ export default function WebcamVideo(props: WebcamVideoProps) {
   };
 
   const onFrame = useCallback(() => {
-    if (!segmenter || !videoRef.current || !clickPos) {
+    let videoWidth = 0;
+    let videoHeight = 0;
+    let videoLeft = 0;
+    let videoTop = 0;
+    let screenWiderThanVideo = false;
+    if (videoRef.current && maskRef.current) {
+      screenWiderThanVideo =
+        window.innerWidth / window.innerHeight >
+        videoRef.current.videoWidth / videoRef.current.videoHeight;
+      if (screenWiderThanVideo) {
+        videoWidth = window.innerWidth;
+        videoHeight =
+          (videoWidth * videoRef.current.videoHeight) /
+          videoRef.current.videoWidth;
+      } else {
+        videoHeight = window.innerHeight;
+        videoWidth =
+          (videoHeight * videoRef.current.videoWidth) /
+          videoRef.current.videoHeight;
+      }
+
+      videoRef.current.width = videoWidth;
+      videoRef.current.height = videoHeight;
+      maskRef.current.width = videoWidth;
+      maskRef.current.height = videoHeight;
+      videoRef.current.style.width = videoWidth + "px";
+      videoRef.current.style.height = videoHeight + "px";
+      maskRef.current.style.width = videoWidth + "px";
+      maskRef.current.style.height = videoHeight + "px";
+      if (screenWiderThanVideo) {
+        videoRef.current.style.top =
+          0.5 * (window.innerHeight - videoHeight) + "px";
+        videoRef.current.style.left = "0px";
+        maskRef.current.style.top =
+          0.5 * (window.innerHeight - videoHeight) + "px";
+        maskRef.current.style.left = "0px";
+        videoLeft = 0;
+        videoTop = 0.5 * (window.innerHeight - videoHeight);
+      } else {
+        // idk why this isn't needed
+        // videoRef.current.style.left = 0.5 * (window.innerWidth - videoWidth) + "px";
+        videoRef.current.style.top = "0px";
+        maskRef.current.style.left =
+          0.5 * (window.innerWidth - videoWidth) + "px";
+        maskRef.current.style.top = "0px";
+        videoTop = 0;
+        videoLeft = 0.5 * (window.innerWidth - videoWidth);
+      }
+    }
+
+    if (!segmenter || !videoRef.current || !maskRef.current || !clickPos) {
       if (maskRef.current) {
         maskRef.current.style.display = "none";
       }
@@ -129,21 +181,18 @@ export default function WebcamVideo(props: WebcamVideoProps) {
     }
 
     if (clickPosRef.current) {
-      clickPosRef.current.style.left = `${
-        videoRef.current.offsetLeft + clickPos.x
-      }px`;
-      clickPosRef.current.style.top = `${
-        videoRef.current.offsetTop + clickPos.y
-      }px`;
+      clickPosRef.current.style.left = `${clickPos.x}px`;
+      clickPosRef.current.style.top = `${clickPos.y}px`;
       if (SHOW_CLICK_POS) {
         clickPosRef.current.style.display = "block";
       }
     }
-    videoRef.current.width = videoRef.current.videoWidth;
-    videoRef.current.height = videoRef.current.videoHeight;
 
     // Segment
-    let segmentPos = clickPos;
+    let segmentPos = {
+      x: (videoRef.current.videoWidth * (clickPos.x - videoLeft)) / videoWidth,
+      y: (videoRef.current.videoHeight * (clickPos.y - videoTop)) / videoHeight,
+    };
     let segmentPrevHadClicked = prevHadClicked;
     segmenter.segment(
       videoRef.current,
@@ -191,7 +240,15 @@ export default function WebcamVideo(props: WebcamVideoProps) {
           y: 1.0 - segmentPos.y / height,
         };
 
-        colorizeAndBlurMask(ctx, width, height, maskData, dt, clickPosNorm);
+        colorizeAndBlurMask(
+          ctx,
+          width,
+          height,
+          maskData,
+          dt,
+          volume.current,
+          clickPosNorm
+        );
         maskRef.current.style.display = "block";
       }
     );
@@ -212,11 +269,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
       );
 
       videoCapture = new cv.VideoCapture(videoRef.current);
-      frame = new cv.Mat(
-        videoRef.current.videoHeight,
-        videoRef.current.videoWidth,
-        cv.CV_8UC4
-      );
+      frame = new cv.Mat(videoHeight, videoWidth, cv.CV_8UC4);
       videoCapture.read(frame);
       cv.cvtColor(frame, oldGray, cv.COLOR_RGB2GRAY);
     } else {
@@ -224,7 +277,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
       videoCapture.read(frame);
       cv.cvtColor(frame, frameGray, cv.COLOR_RGBA2GRAY);
 
-      p0.data32F[0] = videoRef.current.videoWidth - clickPos.x;
+      p0.data32F[0] = videoWidth - clickPos.x;
       p0.data32F[1] = clickPos.y;
 
       // calculate optical flow
@@ -243,7 +296,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
       // did we get a good point?
       if (st.rows === 1 && st.data[0] === 1) {
         clickPos = {
-          x: videoRef.current.videoWidth - p1.data32F[0],
+          x: videoWidth - p1.data32F[0],
           y: p1.data32F[1],
         };
       } else {
@@ -314,8 +367,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
     >
       <video
         style={{
-          width: "100%",
-          height: "100%",
+          position: "absolute",
           objectFit: "cover",
           transform: "scaleX(-1)",
         }}
@@ -325,10 +377,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
         onClick={
           SCREENSHOT_ON_CLICK
             ? (event) => {
-                let rect = videoRef.current!.getBoundingClientRect();
-                let x = event.pageX - rect.left;
-                let y = event.clientY - rect.top;
-                clickPos = { x: x, y: y };
+                clickPos = { x: event.clientX, y: event.clientY };
                 clickTime = new Date().getTime() / 1000;
 
                 prevHadClicked = false;
@@ -346,11 +395,8 @@ export default function WebcamVideo(props: WebcamVideoProps) {
       <canvas
         style={{
           position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
           pointerEvents: "none",
+          objectFit: "cover",
           display: clickPos ? "block" : "none",
         }}
         ref={maskRef}

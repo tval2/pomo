@@ -166,6 +166,7 @@ export default function VoiceSelector() {
           top: 0,
           zIndex: 1,
         }}
+        color="text.secondary"
       >
         Select Voice
       </Typography>
