@@ -1,3 +1,5 @@
+"use client";
+
 import Pomo from "@/components/pomo";
 import WarmStart from "@/components/warmstart";
 import { Box } from "@mui/material";

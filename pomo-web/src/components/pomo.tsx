@@ -3,7 +3,6 @@
 import React, { useCallback, useState, useRef, useEffect } from "react";
 import { LLMData, callChat } from "@/utils/llm";
 import { setAudioEnabled } from "@/utils/tts";
-import { useAudioAnalyzer } from "@/utils/audioContextManager";
 import WebcamVideo from "./webcam";
 import WebcamAudio from "./audio";
 import TextFeed from "./textfeed";
@@ -15,6 +14,7 @@ import {
   PhotoIcon,
 } from "@/ui/icons";
 import { Box, Typography, Divider } from "@mui/material";
+import { useProcessing } from "@/atoms";
 
 interface Response {
   id: number;
@@ -45,6 +45,7 @@ export default function Pomo() {
   const recentImagesRef = useRef<string[]>([]);
 
   const drawerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { isProcessing, setIsProcessing } = useProcessing();
 
   useEffect(() => {
     sendPhotosRef.current = sendPhotos;
@@ -65,6 +66,7 @@ export default function Pomo() {
       }
 
       isProcessingRef.current = true;
+      setIsProcessing(true);
 
       const data: LLMData = {};
 
@@ -82,7 +84,8 @@ export default function Pomo() {
           responseId.current,
           setResponses,
           playAudio,
-          false // turn off object identification; make sure to use the chat feature
+          false, // turn off object identification; make sure to use the chat feature
+          setIsProcessing
         );
 
         if (sendPhotosRef.current && recentImagesRef.current.length > 0) {
@@ -92,9 +95,10 @@ export default function Pomo() {
         console.error("Error processing audio with images:", error);
       } finally {
         isProcessingRef.current = false;
+        setIsProcessing(false);
       }
     },
-    [playAudio]
+    [playAudio, setIsProcessing]
   );
 
   const handleNewImage = useCallback((imageData: string) => {
@@ -111,24 +115,28 @@ export default function Pomo() {
     [processAudioWithImages]
   );
 
-  const processClick = useCallback(async (images: string[]) => {
-    let data: LLMData = { images: images };
+  const processClick = useCallback(
+    async (images: string[]) => {
+      let data: LLMData = { images: images };
 
-    setIsClickProcessing(true);
-    try {
-      clickResponseId.current = await callChat(
-        data,
-        clickResponseId.current,
-        setClickResponses,
-        false,
-        true // use object identification instead of chat
-      );
-    } catch (error) {
-      console.error("Error processing click:", error);
-    } finally {
-      setIsClickProcessing(false);
-    }
-  }, []);
+      setIsClickProcessing(true);
+      try {
+        clickResponseId.current = await callChat(
+          data,
+          clickResponseId.current,
+          setClickResponses,
+          false,
+          true, // use object identification instead of chat
+          setIsProcessing
+        );
+      } catch (error) {
+        console.error("Error processing click:", error);
+      } finally {
+        setIsClickProcessing(false);
+      }
+    },
+    [setIsProcessing]
+  );
 
   const toggleAudioOutput = useCallback(() => {
     playAudioRef.current = !playAudioRef.current;

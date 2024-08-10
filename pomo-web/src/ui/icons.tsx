@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useAudioAnalyzer } from "@/utils/audioContextManager";
 import { Volume2 } from "lucide-react";
 import { IconButton, Tooltip } from "@mui/material";

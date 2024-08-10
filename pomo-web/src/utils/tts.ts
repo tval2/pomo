@@ -5,12 +5,10 @@ import {
   stopCurrentAudio,
 } from "./audioContextManager";
 import { log } from "./performance";
-import { getStore, isPlayingAtom } from "@/store";
-import { selectedVoiceIdAtom } from "@/atoms/voices";
+import { getDefaultStore } from "jotai/vanilla";
+import { selectedVoiceIdAtom } from "@/atoms";
 
 let audioEnabled = true;
-
-const store = getStore();
 
 interface QueueItem {
   text: string;
@@ -23,6 +21,7 @@ interface QueueItem {
 
 let audioQueue: QueueItem[] = [];
 const readyList: Set<number> = new Set();
+export let isPlaying = false;
 let currentIndex = 0;
 let lastActivityTimestamp = Date.now();
 
@@ -61,7 +60,6 @@ export async function queueAudioText(text: string, enabled: boolean) {
 
   if (audioEnabled) {
     fetchNextAudio();
-    const isPlaying = store.get(isPlayingAtom);
     if (!isPlaying) {
       playNextInQueue();
     }
@@ -138,7 +136,6 @@ async function fetchNextAudio() {
     readyList.add(item.index);
     item.audioBuffer = audioBuffer;
 
-    const isPlaying = store.get(isPlayingAtom);
     if (!isPlaying) {
       playNextInQueue();
     }
@@ -156,6 +153,7 @@ export async function streamTTS(item: QueueItem): Promise<AudioBuffer> {
   }
 
   const audioCtx = getAudioContext();
+  const store = getDefaultStore();
   const selectedVoiceId = store.get(selectedVoiceIdAtom);
 
   log("calling ElevenLabs API", "tts1");
@@ -184,20 +182,18 @@ export async function streamTTS(item: QueueItem): Promise<AudioBuffer> {
 
 async function playNextInQueue() {
   if (audioQueue.length === 0 || !audioEnabled) {
-    store.set(isPlayingAtom, false);
+    isPlaying = false;
     return;
   }
 
   const firstItem = audioQueue[0];
 
   if (firstItem.status !== "ready") {
-    store.set(isPlayingAtom, false);
+    isPlaying = false;
     return;
   }
 
-  console.log("isPlaying was:", store.get(isPlayingAtom));
-  store.set(isPlayingAtom, true);
-  console.log("isPlaying set to:", store.get(isPlayingAtom));
+  isPlaying = true;
 
   firstItem.status = "playing";
 
@@ -222,13 +218,12 @@ async function playNextInQueue() {
 export function stopAudio() {
   stopCurrentAudio();
   audioQueue = [];
-  store.set(isPlayingAtom, false);
+  isPlaying = false;
   currentIndex = 0;
 }
 
 export function setAudioEnabled(enabled: boolean) {
   audioEnabled = enabled;
-  const isPlaying = store.get(isPlayingAtom);
   if (!enabled) {
     stopAudio();
   } else if (audioQueue.length > 0 && !isPlaying) {

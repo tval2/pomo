@@ -1,14 +1,12 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Box } from "@mui/material";
-import { stopAudio } from "@/utils/tts";
+import { stopAudio, isPlaying } from "@/utils/tts";
 import { log } from "@/utils/performance";
 import { WebVoiceProcessor } from "@picovoice/web-voice-processor";
 import { WaveFile } from "wavefile";
 import { LinearProgressProcessing, LinearProgressWithLabel } from "@/ui/audio";
-import { useAtomValue, useAtom } from "jotai";
-import { getStore, isPlayingAtom, isProcessingAtom } from "@/store";
-
-const store = getStore();
+import { useAtom } from "jotai";
+import { isProcessingAtom } from "@/atoms";
 
 // currently sampling at 16kHz (16,000 samples per second) @ frame rate of
 //  512 samples per frame, which is 31.25 frames per second (or 0.032 seconds per frame).
@@ -33,28 +31,17 @@ export default function WebcamAudio({
   const sendAudioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const isPlaying = useAtomValue(isPlayingAtom);
   const [isProcessing, setIsProcessing] = useAtom(isProcessingAtom);
-  const isPlayingRef = useRef(isPlaying);
-
-  useEffect(() => {
-    console.log("WebcamAudio rendered, isPlaying:", isPlaying);
-  });
 
   useEffect(() => {
     audioRef.current = new Audio("/sendAudio.mp3");
   }, []);
 
   useEffect(() => {
-    console.log("isPlaying changed:", isPlaying);
-    isPlayingRef.current = isPlaying;
-  }, [isPlaying]);
-
-  useEffect(() => {
     if (isPlaying) {
       setIsProcessing(false);
     }
-  }, [isPlaying, setIsProcessing]);
+  }, [isPlaying]);
 
   function convertPCMToWav(pcmData: Int16Array, sampleRate = 16000) {
     const wav = new WaveFile();
@@ -114,8 +101,7 @@ export default function WebcamAudio({
         }
 
         if (voiceProbability > VAD_THRESHOLD) {
-          console.log("vp:", voiceProbability, "isP", isPlayingRef.current);
-          if (isPlayingRef.current) {
+          if (isPlaying) {
             stopAudio();
           }
 
