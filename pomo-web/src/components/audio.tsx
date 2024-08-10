@@ -5,6 +5,8 @@ import { log } from "@/utils/performance";
 import { WebVoiceProcessor } from "@picovoice/web-voice-processor";
 import { WaveFile } from "wavefile";
 import { LinearProgressProcessing, LinearProgressWithLabel } from "@/ui/audio";
+import { useAtom } from "jotai";
+import { isProcessingAtom } from "@/atoms";
 
 // currently sampling at 16kHz (16,000 samples per second) @ frame rate of
 //  512 samples per frame, which is 31.25 frames per second (or 0.032 seconds per frame).
@@ -22,13 +24,14 @@ export default function WebcamAudio({
   isRecording,
 }: WebcamAudioProps) {
   const [voiceProbability, setVoiceProbability] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
   const engineRef = useRef<any>(null);
   const audioChunksRef = useRef<Int16Array[]>([]);
   const rollingBufferRef = useRef<Int16Array[]>([]);
   const lastVoiceDetectionRef = useRef<number | null>(null);
   const sendAudioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const [isProcessing, setIsProcessing] = useAtom(isProcessingAtom);
 
   useEffect(() => {
     audioRef.current = new Audio("/sendAudio.mp3");

@@ -6,7 +6,7 @@ import {
 } from "./audioContextManager";
 import { log } from "./performance";
 import { getDefaultStore } from "jotai/vanilla";
-import { selectedVoiceIdAtom } from "@/atoms/voices";
+import { selectedVoiceIdAtom } from "@/atoms";
 
 let audioEnabled = true;
 
@@ -194,6 +194,7 @@ async function playNextInQueue() {
   }
 
   isPlaying = true;
+
   firstItem.status = "playing";
 
   const audioCtx = getAudioContext();

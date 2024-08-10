@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useAtom } from "jotai";
-import { voicesAtom, selectedVoiceIdAtom } from "@/atoms/voices";
+import { voicesAtom, selectedVoiceIdAtom } from "@/atoms";
 import {
   Box,
   Typography,

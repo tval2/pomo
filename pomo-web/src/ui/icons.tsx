@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
+import { useAudioAnalyzer } from "@/utils/audioContextManager";
 import { Volume2 } from "lucide-react";
 import { IconButton, Tooltip } from "@mui/material";
 import MicNoneIcon from "@mui/icons-material/MicNone";
@@ -11,17 +12,11 @@ const SELECTED_COLOR =
 
 interface SpeakerIconProps {
   isOn: boolean;
-  volume: number;
   onClick: () => void;
 }
 
-const INITIAL_ICON_SIZE = 30;
-const SpeakerIcon: React.FC<SpeakerIconProps> = ({ isOn, volume, onClick }) => {
-  const [iconSize, setIconSize] = useState(INITIAL_ICON_SIZE);
-
-  useEffect(() => {
-    setIconSize(INITIAL_ICON_SIZE + volume / 100);
-  }, [volume]);
+const SpeakerIcon: React.FC<SpeakerIconProps> = ({ isOn, onClick }) => {
+  const { volume } = useAudioAnalyzer();
 
   return (
     <Tooltip title={isOn ? "TTS On" : "TTS Off"}>
@@ -31,9 +26,10 @@ const SpeakerIcon: React.FC<SpeakerIconProps> = ({ isOn, volume, onClick }) => {
           transition: "all 0.1s ease",
           color: "white",
           background: isOn ? SELECTED_COLOR : "grey",
+          transform: `scale(${1 + volume.current})`,
           "&:hover": {
             background: SELECTED_COLOR,
-            transform: "scale(1.1)",
+            transform: `scale(${(1 + volume.current) * 1.1})`,
           },
         }}
       >

@@ -3,7 +3,6 @@ import { isEndOfSentence, processChunk } from "./helpers";
 import { log } from "./performance";
 
 type Response = { id: number; text: string };
-
 export type LLMData = { audio?: string; images?: string[]; text?: string };
 
 export async function callChat(
@@ -11,10 +10,25 @@ export async function callChat(
   responseId: number,
   setResponses: (responses: (prevResponses: Response[]) => Response[]) => void,
   playAudio: boolean = true, // Whether to play the audio out loud
-  object_identification: boolean = false // Whether to identify the object instead of chat
+  object_identification: boolean = false, // Whether to identify the object instead of chat
+  setIsProcessing: (isProcessing: boolean) => void
 ): Promise<number> {
   if (!data || (!data.images && !data.audio && !data.text)) {
     return responseId;
+  }
+
+  async function readEntireStream(response: any) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      fullText += decoder.decode(value);
+    }
+
+    return fullText;
   }
 
   try {
@@ -35,11 +49,11 @@ export async function callChat(
         `HTTP error! status: ${response.status}, details: ${errorText}`
       );
     }
-    console.log("checkpoint ", 1);
+
     if (!response.body) {
       throw new Error("Response body is null");
     }
-    console.log("checkpoint ", 2);
+
     // If only used to ID the object then bypass stream generator
     if (object_identification) {
       let result = await response.json();
@@ -66,16 +80,19 @@ export async function callChat(
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
+    let cumulativeText = "";
 
     while (true) {
       const { done, value } = await reader.read();
-      console.log("checkpoint ", 3);
       if (done) {
-        console.log("EXITTING ", 0);
+        if (!cumulativeText.trim()) {
+          setIsProcessing(false);
+        }
         break;
       }
-      console.log("checkpoint ", 4);
+
       const chunk = decoder.decode(value);
+      cumulativeText += chunk;
       const processedChunk = processChunk(chunk);
 
       if (processedChunk) {
@@ -107,6 +124,7 @@ export async function callChat(
     return responseId + 1;
   } catch (error) {
     console.error("Error calling chat API:", error);
+    setIsProcessing(false);
     return responseId;
   }
 }

@@ -1,7 +1,7 @@
 // src/app/api/voices/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY4;
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 
 if (!ELEVENLABS_API_KEY) {
   throw new Error("ELEVENLABS_API_KEY is not set in environment variables");

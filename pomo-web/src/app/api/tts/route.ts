@@ -43,7 +43,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     const statusCode = (error as any).statusCode || "Unknown status code";
-    console.warn(`Warning: Error accessing TTS: Status code: ${statusCode}`);
+    console.warn(
+      `Warning: Error accessing TTS: Status code: ${statusCode}:`,
+      (error as Error).message
+    );
 
     return NextResponse.json(
       { message: "Error accessing TTS API", error: (error as Error).message },

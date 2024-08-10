@@ -7,6 +7,7 @@ import {
   SYSTEM_PROMPT,
   SYSTEM_PROMPT_RESPONSE,
   SYSTEM_PROMPT_OBJECT_ID,
+  DEFAULT_AGENT_ROLE,
 } from "./prompts";
 import { LLMData } from "@/utils/llm";
 
@@ -52,11 +53,11 @@ let chat = model.startChat({
   history: [
     {
       role: "user",
-      parts: [{ text: SYSTEM_PROMPT("water bottle") }],
+      parts: [{ text: SYSTEM_PROMPT(DEFAULT_AGENT_ROLE) }],
     },
     {
       role: "model",
-      parts: [{ text: SYSTEM_PROMPT_RESPONSE("water bottle") }],
+      parts: [{ text: SYSTEM_PROMPT_RESPONSE(DEFAULT_AGENT_ROLE) }],
     },
   ],
   generationConfig: {

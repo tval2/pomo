@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useAtom } from "jotai";
-import { voicesAtom } from "@/atoms/voices";
+import { voicesAtom } from "@/atoms";
 
 const API_ROUTES = ["chat", "tts", "vad"];
 const DAVE_DATA = {

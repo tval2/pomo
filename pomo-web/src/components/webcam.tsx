@@ -88,7 +88,6 @@ export default function WebcamVideo(props: WebcamVideoProps) {
           facingMode: "user",
           width: { ideal: 3840 },
           height: { ideal: 2160 },
-          frameRate: { ideal: 60 },
           aspectRatio: 16 / 9,
         },
         audio: false,
@@ -126,13 +125,19 @@ export default function WebcamVideo(props: WebcamVideoProps) {
     let videoTop = 0;
     let screenWiderThanVideo = false;
     if (videoRef.current && maskRef.current) {
-      screenWiderThanVideo = window.innerWidth / window.innerHeight > videoRef.current.videoWidth / videoRef.current.videoHeight;
+      screenWiderThanVideo =
+        window.innerWidth / window.innerHeight >
+        videoRef.current.videoWidth / videoRef.current.videoHeight;
       if (screenWiderThanVideo) {
         videoWidth = window.innerWidth;
-        videoHeight = videoWidth * videoRef.current.videoHeight / videoRef.current.videoWidth;
+        videoHeight =
+          (videoWidth * videoRef.current.videoHeight) /
+          videoRef.current.videoWidth;
       } else {
         videoHeight = window.innerHeight;
-        videoWidth = videoHeight * videoRef.current.videoWidth / videoRef.current.videoHeight;
+        videoWidth =
+          (videoHeight * videoRef.current.videoWidth) /
+          videoRef.current.videoHeight;
       }
 
       videoRef.current.width = videoWidth;
@@ -144,9 +149,11 @@ export default function WebcamVideo(props: WebcamVideoProps) {
       maskRef.current.style.width = videoWidth + "px";
       maskRef.current.style.height = videoHeight + "px";
       if (screenWiderThanVideo) {
-        videoRef.current.style.top = 0.5 * (window.innerHeight - videoHeight) + "px";
+        videoRef.current.style.top =
+          0.5 * (window.innerHeight - videoHeight) + "px";
         videoRef.current.style.left = "0px";
-        maskRef.current.style.top = 0.5 * (window.innerHeight - videoHeight) + "px";
+        maskRef.current.style.top =
+          0.5 * (window.innerHeight - videoHeight) + "px";
         maskRef.current.style.left = "0px";
         videoLeft = 0;
         videoTop = 0.5 * (window.innerHeight - videoHeight);
@@ -154,7 +161,8 @@ export default function WebcamVideo(props: WebcamVideoProps) {
         // idk why this isn't needed
         // videoRef.current.style.left = 0.5 * (window.innerWidth - videoWidth) + "px";
         videoRef.current.style.top = "0px";
-        maskRef.current.style.left = 0.5 * (window.innerWidth - videoWidth) + "px";
+        maskRef.current.style.left =
+          0.5 * (window.innerWidth - videoWidth) + "px";
         maskRef.current.style.top = "0px";
         videoTop = 0;
         videoLeft = 0.5 * (window.innerWidth - videoWidth);
@@ -182,8 +190,8 @@ export default function WebcamVideo(props: WebcamVideoProps) {
 
     // Segment
     let segmentPos = {
-      x: videoRef.current.videoWidth * (clickPos.x - videoLeft) / videoWidth,
-      y: videoRef.current.videoHeight * (clickPos.y - videoTop) / videoHeight
+      x: (videoRef.current.videoWidth * (clickPos.x - videoLeft)) / videoWidth,
+      y: (videoRef.current.videoHeight * (clickPos.y - videoTop)) / videoHeight,
     };
     let segmentPrevHadClicked = prevHadClicked;
     segmenter.segment(
@@ -232,7 +240,15 @@ export default function WebcamVideo(props: WebcamVideoProps) {
           y: 1.0 - segmentPos.y / height,
         };
 
-        colorizeAndBlurMask(ctx, width, height, maskData, dt, volume.current, clickPosNorm);
+        colorizeAndBlurMask(
+          ctx,
+          width,
+          height,
+          maskData,
+          dt,
+          volume.current,
+          clickPosNorm
+        );
         maskRef.current.style.display = "block";
       }
     );
@@ -253,11 +269,7 @@ export default function WebcamVideo(props: WebcamVideoProps) {
       );
 
       videoCapture = new cv.VideoCapture(videoRef.current);
-      frame = new cv.Mat(
-        videoHeight,
-        videoWidth,
-        cv.CV_8UC4
-      );
+      frame = new cv.Mat(videoHeight, videoWidth, cv.CV_8UC4);
       videoCapture.read(frame);
       cv.cvtColor(frame, oldGray, cv.COLOR_RGB2GRAY);
     } else {
@@ -365,11 +377,11 @@ export default function WebcamVideo(props: WebcamVideoProps) {
         onClick={
           SCREENSHOT_ON_CLICK
             ? (event) => {
-              clickPos = { x: event.clientX, y: event.clientY };
-              clickTime = new Date().getTime() / 1000;
+                clickPos = { x: event.clientX, y: event.clientY };
+                clickTime = new Date().getTime() / 1000;
 
-              prevHadClicked = false;
-            }
+                prevHadClicked = false;
+              }
             : undefined
         }
       />
