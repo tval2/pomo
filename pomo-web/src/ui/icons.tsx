@@ -26,10 +26,10 @@ const SpeakerIcon: React.FC<SpeakerIconProps> = ({ isOn, onClick }) => {
           transition: "all 0.1s ease",
           color: "white",
           background: isOn ? SELECTED_COLOR : "grey",
-          transform: `scale(${1 + volume})`,
+          transform: `scale(${1 + volume.current})`,
           "&:hover": {
             background: SELECTED_COLOR,
-            transform: `scale(${(1 + volume) * 1.1})`,
+            transform: `scale(${(1 + volume.current) * 1.1})`,
           },
         }}
       >
