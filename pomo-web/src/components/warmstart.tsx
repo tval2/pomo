@@ -47,6 +47,10 @@ export default function WarmStart() {
     };
 
     warmUpAllAPIs();
+
+    const intervalId = setInterval(warmUpAllAPIs, 10 * 1000); // Run every 10 seconds
+
+    return () => clearInterval(intervalId);
   }, []);
 
   useEffect(() => {
