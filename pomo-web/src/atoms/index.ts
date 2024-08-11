@@ -1,4 +1,5 @@
 import { atom, useAtom } from "jotai";
+import { createStore } from "jotai/vanilla";
 
 export const DEFAULT_VOICE_ID = "CYw3kZ02Hs0563khs1Fj"; // Dave (https://elevenlabs.io/docs/voices/premade-voices);
 export interface Voice {
@@ -22,3 +23,6 @@ export const useProcessing = () => {
     stopProcessing: () => setIsProcessing(false),
   };
 };
+
+export const store = createStore();
+store.sub(selectedVoiceIdAtom, () => {});

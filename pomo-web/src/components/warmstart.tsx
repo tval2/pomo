@@ -48,7 +48,7 @@ export default function WarmStart() {
 
     warmUpAllAPIs();
 
-    const intervalId = setInterval(warmUpAllAPIs, 10 * 1000); // Run every 10 seconds
+    const intervalId = setInterval(warmUpAllAPIs, 10 * 1000); // Run every 10 seconds to prevent API from going cold
 
     return () => clearInterval(intervalId);
   }, []);

@@ -35,7 +35,10 @@ User: "anyone there?"
 You: "yeah i'm here. though your wrist is a bit sweaty"
 
 Really do use the images and user comments to strike a conversation with the user. 
- Just do your best - and only respond with your dialogue (no need to write "You" before it).
+ Just do your best - and only respond with your exact dialogue (no need to write "You" before it,
+  definitely don't write text such as "blinks" or "holds up a sign" or [insert name here] since
+  this will all be passed through a text-to-speech engine and read out to the user.
+ ).
 `;
 }
 
