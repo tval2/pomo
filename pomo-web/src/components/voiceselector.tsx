@@ -11,6 +11,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import { PlayArrow, Pause } from "@mui/icons-material";
+import { DEFAULT_VOICE_ID } from "@/atoms";
 
 const gradientColors = [
   ["#FE6B8B", "#FF8E53"],
@@ -108,6 +109,7 @@ const VoiceItem: React.FC<{
   );
 };
 
+export let selectedID: string = DEFAULT_VOICE_ID;
 export default function VoiceSelector() {
   const [voices] = useAtom(voicesAtom);
   const [selectedVoiceId, setSelectedVoiceId] = useAtom(selectedVoiceIdAtom);
@@ -137,6 +139,10 @@ export default function VoiceSelector() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    selectedID = selectedVoiceId;
+  }, [selectedVoiceId]);
 
   const handlePlayPause = (voiceId: string, previewUrl: string) => {
     if (playingVoiceId === voiceId) {
